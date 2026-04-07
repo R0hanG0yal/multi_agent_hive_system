@@ -8,39 +8,48 @@ Implements:
   • TD Error: Target - Old Estimate → Q function update
   • Q-Table: Agent confidence weights that improve over time
   • Epsilon-Greedy (ε): Exploration vs Exploitation toggle
-    - ε → 1: More exploration (try different agents)
-    - ε → 0: More exploitation (always pick best known agent)
   • Reward Node: Calculates reward signal from user feedback
-  • Memory Update: Stores Q-values persistently via SQLite
-
-States = domain categories detected by the Router
-Actions = agent node selections
-Rewards = user feedback (👍 = +1, 👎 = -1, no feedback = 0)
+  • Memory Update: Stores Q-values + reward history persistently via SQLite
+  • Task Classifier: Easy / Medium / Hard based on token usage
 """
 import json
 import random
 import sqlite3
-from typing import Dict
+import datetime
+from typing import Dict, List
 
-GAMMA = 0.9          # Discount factor — balances immediate vs future reward
-ALPHA = 0.1          # Learning rate — how fast Q-values update
-EPSILON_START = 0.3  # Initial exploration rate
-EPSILON_MIN = 0.05   # Minimum exploration (always do some exploration)
-EPSILON_DECAY = 0.995  # Multiply ε by this after each interaction
+GAMMA = 0.9
+ALPHA = 0.1
+EPSILON_START = 0.3
+EPSILON_MIN = 0.05
+EPSILON_DECAY = 0.995
 
-# Agent names (actions)
 AGENTS = ["FoodNode", "BusinessNode", "CodingNode", "ResearchNode"]
-
-# State space = domain categories
 STATES = ["food", "business", "coding", "research", "general"]
+
+# Task difficulty thresholds (by total tokens used: prompt + completion)
+DIFFICULTY_EASY   = 300   # ≤ 300 tokens  → Easy
+DIFFICULTY_MEDIUM = 700   # ≤ 700 tokens  → Medium
+# > 700 tokens            → Hard
+
+
+def classify_task(total_tokens: int) -> str:
+    """
+    Classifies a task as Easy / Medium / Hard based on token consumption.
+    Token usage is a proxy for query and response complexity.
+    """
+    if total_tokens <= DIFFICULTY_EASY:
+        return "easy"
+    elif total_tokens <= DIFFICULTY_MEDIUM:
+        return "medium"
+    else:
+        return "hard"
 
 
 class QLearningController:
     """
     Tabular Q-Learning controller as specified in the flowchart.
-
     Q-Table: dict[state][agent_name] → Q-value (0.5 default)
-    Higher Q-value = higher weight given to that agent's response for this domain.
     """
 
     def __init__(self, db_path: str = "hive_data.db"):
@@ -49,23 +58,30 @@ class QLearningController:
         self.q_table: Dict[str, Dict[str, float]] = self._load_or_init_qtable()
         self.interaction_count = self._load_interaction_count()
 
-    # ─── Q-Table Persistence ──────────────────────────────────────────────────
+    # ─── DB Helpers ───────────────────────────────────────────────────────────
 
     def _get_conn(self):
         return sqlite3.connect(self.db_path, check_same_thread=False)
 
     def _load_or_init_qtable(self) -> Dict[str, Dict[str, float]]:
-        """Load Q-table from SQLite; initialise with 0.5 if not found."""
         conn = self._get_conn()
         conn.execute('''CREATE TABLE IF NOT EXISTS q_table (
+            state TEXT, agent TEXT, q_value REAL, PRIMARY KEY (state, agent))''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS rl_meta (
+            key TEXT PRIMARY KEY, value TEXT)''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS reward_history (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            interaction INTEGER,
             state TEXT,
             agent TEXT,
-            q_value REAL,
-            PRIMARY KEY (state, agent)
-        )''')
-        conn.execute('''CREATE TABLE IF NOT EXISTS rl_meta (
-            key TEXT PRIMARY KEY,
-            value TEXT
+            reward REAL,
+            td_error REAL,
+            old_q REAL,
+            new_q REAL,
+            epsilon REAL,
+            task_difficulty TEXT,
+            total_tokens INTEGER
         )''')
         conn.commit()
 
@@ -74,10 +90,7 @@ class QLearningController:
         conn.close()
 
         if not rows:
-            # Initialise Q-table to 0.5 (neutral) for all state-action pairs
-            table = {}
-            for state in STATES:
-                table[state] = {agent: 0.5 for agent in AGENTS}
+            table = {state: {agent: 0.5 for agent in AGENTS} for state in STATES}
             self._save_qtable(table)
             return table
 
@@ -88,16 +101,14 @@ class QLearningController:
             table[state][agent] = q_value
         return table
 
-    def _save_qtable(self, table: Dict[str, Dict[str, float]]):
+    def _save_qtable(self, table):
         conn = self._get_conn()
         for state, actions in table.items():
             for agent, q_val in actions.items():
                 conn.execute(
                     "INSERT OR REPLACE INTO q_table (state, agent, q_value) VALUES (?,?,?)",
-                    (state, agent, q_val)
-                )
-        conn.commit()
-        conn.close()
+                    (state, agent, q_val))
+        conn.commit(); conn.close()
 
     def _load_interaction_count(self) -> int:
         conn = self._get_conn()
@@ -108,61 +119,46 @@ class QLearningController:
 
     def _save_meta(self):
         conn = self._get_conn()
-        conn.execute(
-            "INSERT OR REPLACE INTO rl_meta (key, value) VALUES ('interaction_count', ?)",
-            (str(self.interaction_count),)
-        )
-        conn.execute(
-            "INSERT OR REPLACE INTO rl_meta (key, value) VALUES ('epsilon', ?)",
-            (str(self.epsilon),)
-        )
-        conn.commit()
-        conn.close()
+        conn.execute("INSERT OR REPLACE INTO rl_meta (key, value) VALUES ('interaction_count', ?)",
+                     (str(self.interaction_count),))
+        conn.execute("INSERT OR REPLACE INTO rl_meta (key, value) VALUES ('epsilon', ?)",
+                     (str(self.epsilon),))
+        conn.commit(); conn.close()
 
-    # ─── Core Q-Learning Logic ────────────────────────────────────────────────
+    def _save_reward_event(self, state, agent, reward, td_error, old_q, new_q, difficulty, tokens):
+        conn = self._get_conn()
+        conn.execute('''INSERT INTO reward_history
+            (timestamp, interaction, state, agent, reward, td_error, old_q, new_q, epsilon, task_difficulty, total_tokens)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?)''', (
+            datetime.datetime.utcnow().isoformat(),
+            self.interaction_count,
+            state, agent, reward, td_error, old_q, new_q,
+            round(self.epsilon, 4), difficulty, tokens
+        ))
+        conn.commit(); conn.close()
+
+    # ─── Core Q-Learning Logic ─────────────────────────────────────────────────
 
     def get_weights(self, state: str) -> Dict[str, float]:
-        """
-        Returns Q-values (weights) for all agents in a given state.
-        These weights multiply agent confidence scores in the Decision Engine.
-        Implements Epsilon-Greedy: with probability ε, return uniform weights (exploration).
-        """
-        # Epsilon-Greedy Exploration vs Exploitation
         if random.random() < self.epsilon:
-            # Exploration: return uniform weights
             return {agent: 1.0 for agent in AGENTS}
-
-        # Exploitation: return learned Q-values normalised to [0.5, 1.5]
         state_values = self.q_table.get(state, {agent: 0.5 for agent in AGENTS})
         max_q = max(state_values.values()) or 1.0
         min_q = min(state_values.values()) or 0.0
         denom = (max_q - min_q) or 1.0
-
-        weights = {}
-        for agent, q_val in state_values.items():
-            # Normalise to [0.5, 1.5] range
-            weights[agent] = 0.5 + ((q_val - min_q) / denom)
-        return weights
+        return {agent: 0.5 + ((q - min_q) / denom) for agent, q in state_values.items()}
 
     def compute_reward(self, feedback: str) -> float:
-        """
-        Reward Node — translates user feedback into RL reward signal.
-        👍 = +1.0 (correct)     👎 = -0.5 (incorrect, still partial)
-        None = 0.0 (no signal)
-        """
-        if feedback == "positive":
-            return 1.0
-        elif feedback == "negative":
-            return -0.5
+        """Reward Node: 👍=+1.0  👎=-0.5  none=0.0"""
+        if feedback == "positive":   return 1.0
+        elif feedback == "negative": return -0.5
         return 0.0
 
-    def update(self, state: str, agent_name: str, reward: float, next_state: str):
+    def update(self, state: str, agent_name: str, reward: float, next_state: str,
+               total_tokens: int = 0):
         """
-        Bellman Equation Q-update:
-        Q(s, a) ← Q(s, a) + α [R + γ·max_a'(Q(s', a')) − Q(s, a)]
-
-        TD Error = R + γ·max_a'(Q(s', a')) − Q(s, a)
-        Q(s, a) ← Q(s, a) + α · TD_Error
+        Bellman Q-update + persist reward event with task difficulty.
+        Q(s,a) ← Q(s,a) + α[R + γ·maxQ(s',a') − Q(s,a)]
         """
         if state not in self.q_table:
             self.q_table[state] = {agent: 0.5 for agent in AGENTS}
@@ -170,43 +166,54 @@ class QLearningController:
             self.q_table[state][agent_name] = 0.5
 
         current_q = self.q_table[state][agent_name]
+        next_vals  = self.q_table.get(next_state, {a: 0.5 for a in AGENTS})
+        max_future = max(next_vals.values()) if next_vals else 0.5
 
-        # Max Q-value for the next state (future reward)
-        next_state_values = self.q_table.get(next_state, {agent: 0.5 for agent in AGENTS})
-        max_future_q = max(next_state_values.values()) if next_state_values else 0.5
+        td_target = reward + GAMMA * max_future
+        td_error  = td_target - current_q
+        new_q     = max(0.0, min(1.0, current_q + ALPHA * td_error))
 
-        # Bellman TD Target
-        td_target = reward + GAMMA * max_future_q
-        # TD Error
-        td_error = td_target - current_q
-        # Q Update
-        new_q = current_q + ALPHA * td_error
-
-        # Clamp Q-value to [0.0, 1.0]
-        self.q_table[state][agent_name] = max(0.0, min(1.0, new_q))
-
-        # Epsilon Decay (towards exploitation over time)
+        self.q_table[state][agent_name] = new_q
         self.epsilon = max(EPSILON_MIN, self.epsilon * EPSILON_DECAY)
         self.interaction_count += 1
 
-        # Persist to DB
+        difficulty = classify_task(total_tokens)
+
         self._save_qtable(self.q_table)
         self._save_meta()
+        self._save_reward_event(state, agent_name, reward, td_error,
+                                current_q, new_q, difficulty, total_tokens)
 
         return {
             "td_error": round(td_error, 4),
-            "old_q": round(current_q, 4),
-            "new_q": round(self.q_table[state][agent_name], 4),
-            "epsilon": round(self.epsilon, 4)
+            "old_q":    round(current_q, 4),
+            "new_q":    round(new_q, 4),
+            "epsilon":  round(self.epsilon, 4),
+            "difficulty": difficulty,
+            "total_tokens": total_tokens
         }
 
+    def get_reward_history(self, limit: int = 50) -> List[dict]:
+        """Returns last N reward events for charting."""
+        conn = self._get_conn()
+        cursor = conn.execute('''
+            SELECT interaction, reward, td_error, new_q, epsilon,
+                   task_difficulty, total_tokens, agent, state, timestamp
+            FROM reward_history
+            ORDER BY id DESC LIMIT ?''', (limit,))
+        rows = cursor.fetchall()
+        conn.close()
+        cols = ["interaction","reward","td_error","new_q","epsilon",
+                "task_difficulty","total_tokens","agent","state","timestamp"]
+        return [dict(zip(cols, r)) for r in reversed(rows)]
+
     def get_stats(self) -> dict:
-        """Returns RL stats for monitoring/UI display."""
         return {
             "epsilon": round(self.epsilon, 4),
             "interaction_count": self.interaction_count,
             "q_table": {
                 state: {k: round(v, 3) for k, v in agents.items()}
                 for state, agents in self.q_table.items()
-            }
+            },
+            "reward_history": self.get_reward_history(50)
         }

@@ -149,6 +149,11 @@ async def read_support():
     with open("public/support.html", "r", encoding="utf-8") as f:
         return f.read()
 
+@app.get("/dashboard", response_class=HTMLResponse)
+async def read_dashboard():
+    with open("public/dashboard.html", "r", encoding="utf-8") as f:
+        return f.read()
+
 @app.get("/dev", response_class=HTMLResponse)
 async def read_dev():
     with open("public/index.html", "r", encoding="utf-8") as f:

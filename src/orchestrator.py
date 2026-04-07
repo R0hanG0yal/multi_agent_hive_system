@@ -46,6 +46,7 @@ class HiveOrchestrator:
         # Tracks the last routing state for RL feedback
         self._last_state: str = "general"
         self._last_primary_agent: str = "ResearchNode"
+        self._last_total_tokens: int = 0
 
     # ─── Main Pipeline ────────────────────────────────────────────────────────
 
@@ -123,6 +124,9 @@ class HiveOrchestrator:
         # ── 9. Track state for upcoming RL feedback update ────────────────────
         self._last_state = routing_state
         self._last_primary_agent = decision.primary_agent
+        # Estimate token usage (Groq sometimes returns usage, fallback to char-based estimate)
+        approx_tokens = int((len(query) + len(decision.chosen_response)) / 4)
+        self._last_total_tokens = approx_tokens
 
         return {
             "response": decision.chosen_response,
@@ -135,7 +139,10 @@ class HiveOrchestrator:
                 "conflict_agents": conflict_report.conflicting_agents,
                 "agent_scores": decision.all_agent_scores,
                 "rl_epsilon": round(self.rl_controller.epsilon, 4),
-                "q_weights": {k: round(v, 3) for k, v in q_weights.items()}
+                "q_weights": {k: round(v, 3) for k, v in q_weights.items()},
+                "approx_tokens": approx_tokens,
+                "task_difficulty": self.rl_controller.get_reward_history(1)[0]["task_difficulty"]
+                    if self.rl_controller.interaction_count > 0 else "easy"
             }
         }
 
@@ -154,7 +161,8 @@ class HiveOrchestrator:
             state=self._last_state,
             agent_name=self._last_primary_agent,
             reward=reward,
-            next_state=self._last_state  # Simplified; future: track episode state transitions
+            next_state=self._last_state,
+            total_tokens=self._last_total_tokens
         )
 
         return {
