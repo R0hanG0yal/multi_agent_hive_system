@@ -200,7 +200,9 @@ async def read_support():
         return f.read()
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def read_dashboard():
+async def read_dashboard(key: str = None):
+    if key != "hive_admin_2025":
+        return HTMLResponse("<h1>403 Forbidden</h1><p>Dashboard is locked. Admin key required.</p>", status_code=403)
     with open("public/dashboard.html", "r", encoding="utf-8") as f:
         return f.read()
 
