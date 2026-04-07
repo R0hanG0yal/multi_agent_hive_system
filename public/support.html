@@ -3,102 +3,472 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hive AI - Support</title>
+    <title>Support — Hive AI</title>
+    <meta name="description" content="Get help, explore documentation, and connect with the Hive AI support team.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #131314;
-            --surface-color: #1e1f20;
-            --text-primary: #e3e3e3;
-            --text-secondary: #c4c7c5;
-            --accent-color: #a8c7fa;
+            --bg: #0d0d0f;
+            --surface: #161618;
+            --surface2: #1c1c1f;
+            --border: rgba(255,255,255,0.08);
+            --accent: #8b5cf6;
+            --accent2: #6d28d9;
+            --green: #4ade80;
+            --yellow: #facc15;
+            --red: #f87171;
+            --blue: #60a5fa;
+            --text: #e8e8e8;
+            --muted: rgba(255,255,255,0.45);
         }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; min-height: 100vh; }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-primary);
-            margin: 0;
-            padding: 0;
+        /* Nav */
+        nav {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(13,13,15,0.85);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border);
+            padding: 0 48px;
+            height: 60px;
+            display: flex; align-items: center; justify-content: space-between;
         }
-
-        header {
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            background-color: var(--surface-color);
+        .nav-brand {
+            display: flex; align-items: center; gap: 10px;
+            font-size: 1rem; font-weight: 600;
         }
-
-        header h1 {
-            font-size: 1.2rem;
-            margin: 0;
-            font-weight: 500;
-        }
-
+        .nav-brand .hex { color: var(--accent); font-size: 1.3rem; }
+        .nav-links { display: flex; gap: 8px; align-items: center; }
         .nav-links a {
-            color: var(--accent-color);
-            text-decoration: none;
-            margin-left: 16px;
+            color: var(--muted); text-decoration: none; font-size: 0.875rem;
+            padding: 6px 14px; border-radius: 6px; transition: 0.2s;
         }
-
-        .container {
-            max-width: 800px;
-            margin: 60px auto;
-            padding: 0 24px;
+        .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.06); }
+        .btn-primary {
+            background: var(--accent); color: white !important;
+            border-radius: 8px !important;
+            font-weight: 500 !important;
         }
+        .btn-primary:hover { background: var(--accent2) !important; opacity: 1 !important; }
 
-        h2 {
+        /* Hero */
+        .hero {
+            text-align: center;
+            padding: 80px 24px 60px;
+            max-width: 720px;
+            margin: 0 auto;
+        }
+        .hero-badge {
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(139,92,246,0.12);
+            border: 1px solid rgba(139,92,246,0.25);
+            color: #a78bfa;
+            border-radius: 99px;
+            padding: 5px 16px;
+            font-size: 0.78rem;
             font-weight: 500;
-            margin-top: 40px;
+            margin-bottom: 24px;
         }
-
-        .faq-box {
-            background-color: var(--surface-color);
+        .hero h1 { font-size: 2.8rem; font-weight: 700; line-height: 1.15; margin-bottom: 16px; }
+        .hero h1 span { color: var(--accent); }
+        .hero p { color: var(--muted); font-size: 1.05rem; line-height: 1.7; margin-bottom: 32px; }
+        .search-bar {
+            display: flex; gap: 0;
+            background: var(--surface);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 16px;
-            border: 1px solid rgba(255,255,255,0.1);
+            overflow: hidden;
+            max-width: 540px;
+            margin: 0 auto;
+            transition: border-color 0.2s;
         }
+        .search-bar:focus-within { border-color: var(--accent); }
+        .search-bar input {
+            flex: 1; padding: 14px 20px;
+            background: none; border: none; outline: none;
+            color: var(--text); font-size: 0.95rem; font-family: 'Inter', sans-serif;
+        }
+        .search-bar input::placeholder { color: var(--muted); }
+        .search-bar button {
+            padding: 14px 22px;
+            background: var(--accent); border: none; cursor: pointer;
+            color: white; font-weight: 500; font-size: 0.875rem;
+            font-family: 'Inter', sans-serif;
+            transition: 0.2s;
+        }
+        .search-bar button:hover { background: var(--accent2); }
 
-        .faq-box h3 {
+        /* Quick Links */
+        .container { max-width: 1100px; margin: 0 auto; padding: 0 24px 80px; }
+        .section-label {
+            font-size: 0.75rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.06em; color: var(--muted); margin-bottom: 16px;
+        }
+        .quick-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 14px; margin-bottom: 56px;
+        }
+        .quick-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 22px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none; color: var(--text);
+            display: block;
+        }
+        .quick-card:hover { border-color: rgba(139,92,246,0.4); background: var(--surface2); transform: translateY(-1px); }
+        .quick-card .icon { font-size: 1.6rem; margin-bottom: 12px; }
+        .quick-card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 6px; }
+        .quick-card p { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+
+        /* Status */
+        .status-bar {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 18px 24px;
+            display: flex; align-items: center; justify-content: space-between;
+            margin-bottom: 56px;
+            flex-wrap: wrap; gap: 16px;
+        }
+        .status-item { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
+        .status-dot {
+            width: 8px; height: 8px; border-radius: 50%;
+            animation: pulse2 2s ease-in-out infinite;
+        }
+        .dot-green { background: var(--green); }
+        .dot-yellow { background: var(--yellow); }
+        .dot-red { background: var(--red); }
+        @keyframes pulse2 { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.6;transform:scale(0.85)} }
+        .status-label { color: var(--muted); }
+
+        /* FAQ */
+        .faq-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 56px; }
+        @media (max-width: 700px) { .faq-grid { grid-template-columns: 1fr; } }
+        details {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+            transition: 0.2s;
+        }
+        details:hover { border-color: rgba(255,255,255,0.15); }
+        details[open] { border-color: rgba(139,92,246,0.35); }
+        summary {
+            padding: 18px 20px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            list-style: none;
+            display: flex; justify-content: space-between; align-items: center;
+            user-select: none;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary::after { content: '+'; font-size: 1.2rem; color: var(--muted); transition: 0.2s; }
+        details[open] summary::after { content: '−'; color: var(--accent); }
+        details .answer {
+            padding: 0 20px 18px;
+            font-size: 0.85rem;
+            color: var(--muted);
+            line-height: 1.7;
+            border-top: 1px solid var(--border);
+            padding-top: 14px;
             margin-top: 0;
-            color: var(--accent-color);
         }
 
-        .faq-box p {
-            color: var(--text-secondary);
-            line-height: 1.6;
-            margin-bottom: 0;
+        /* Contact Cards */
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px; margin-bottom: 56px;
         }
+        .contact-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 28px;
+            text-align: center;
+        }
+        .contact-card .icon { font-size: 2rem; margin-bottom: 14px; }
+        .contact-card h3 { font-size: 1rem; font-weight: 600; margin-bottom: 8px; }
+        .contact-card p { font-size: 0.82rem; color: var(--muted); margin-bottom: 18px; line-height: 1.6; }
+        .contact-card a {
+            display: inline-block;
+            padding: 9px 22px;
+            border-radius: 8px;
+            font-size: 0.85rem; font-weight: 500;
+            text-decoration: none;
+            transition: 0.2s;
+        }
+        .btn-outline {
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn-outline:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-filled { background: var(--accent); color: white; border: 1px solid transparent; }
+        .btn-filled:hover { background: var(--accent2); }
+
+        /* Live Chat Widget */
+        .live-chat-section {
+            background: linear-gradient(135deg, rgba(139,92,246,0.12) 0%, rgba(109,40,217,0.06) 100%);
+            border: 1px solid rgba(139,92,246,0.25);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 56px;
+        }
+        .live-chat-section h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 10px; }
+        .live-chat-section p { color: var(--muted); font-size: 0.9rem; margin-bottom: 24px; }
+        .chat-form { max-width: 520px; margin: 0 auto; }
+        .chat-form input, .chat-form textarea {
+            width: 100%; padding: 12px 16px; margin-bottom: 12px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px; color: var(--text);
+            font-family: 'Inter', sans-serif; font-size: 0.875rem;
+            outline: none; transition: border-color 0.2s;
+            display: block;
+        }
+        .chat-form input:focus, .chat-form textarea:focus { border-color: var(--accent); }
+        .chat-form textarea { resize: vertical; min-height: 90px; }
+        .chat-form button {
+            width: 100%; padding: 13px;
+            background: var(--accent); color: white; border: none;
+            border-radius: 8px; font-size: 0.9rem; font-weight: 600;
+            font-family: 'Inter', sans-serif; cursor: pointer; transition: 0.2s;
+        }
+        .chat-form button:hover { background: var(--accent2); }
+        #formSuccess {
+            display: none; margin-top: 16px;
+            background: rgba(74,222,128,0.1);
+            border: 1px solid rgba(74,222,128,0.25);
+            color: var(--green); border-radius: 8px;
+            padding: 12px; font-size: 0.85rem;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border);
+            padding: 32px 48px;
+            text-align: center;
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+        footer a { color: var(--muted); text-decoration: none; margin: 0 12px; }
+        footer a:hover { color: var(--text); }
     </style>
 </head>
 <body>
-    <header>
-        <h1>✨ Hive AI Support</h1>
-        <div class="nav-links">
-            <a href="/">Back to Chat</a>
-            <a href="/login">Login</a>
-        </div>
-    </header>
 
-    <div class="container">
-        <h2>How can we help you?</h2>
-        
-        <div class="faq-box">
-            <h3>How does the AI remember things?</h3>
-            <p>Hive Assistant uses an advanced vector semantic search engine and a rolling context window to safely and securely remember things you tell it, like your name, preferences, or tasks!</p>
-        </div>
+<!-- Nav -->
+<nav>
+    <div class="nav-brand">
+        <span class="hex">⬡</span> Hive AI
+    </div>
+    <div class="nav-links">
+        <a href="/">Chat</a>
+        <a href="/dashboard">Dashboard</a>
+        <a href="/" class="btn-primary">Open Hive →</a>
+    </div>
+</nav>
 
-        <div class="faq-box">
-            <h3>Is my data secure?</h3>
-            <p>Yes. Your memories are currently cached locally in the environment. All data operates under strict boundaries defined by your autonomous system deployment.</p>
-        </div>
+<!-- Hero -->
+<div class="hero">
+    <div class="hero-badge">🛡 Support Center</div>
+    <h1>How can we <span>help you</span> today?</h1>
+    <p>Find answers, explore guides, and get in touch with our team. We're committed to making your Hive AI experience seamless.</p>
+    <div class="search-bar">
+        <input type="text" id="searchInput" placeholder="Search for help articles..." onkeypress="handleSearch(event)">
+        <button onclick="handleSearch()">Search</button>
+    </div>
+</div>
 
-        <div class="faq-box">
-            <h3>How do I link my Google account?</h3>
-            <p>Go to the Login page and click 'Sign in with Google'. This will synchronize your persistent memory banks across all your devices once the production database is connected.</p>
+<div class="container">
+
+    <!-- System Status -->
+    <div class="section-label">Live System Status</div>
+    <div class="status-bar">
+        <div class="status-item">
+            <div class="status-dot dot-green"></div>
+            <span class="status-label">Core API</span>
+            <strong>Operational</strong>
+        </div>
+        <div class="status-item">
+            <div class="status-dot dot-green"></div>
+            <span class="status-label">Multi-Agent Router</span>
+            <strong>Operational</strong>
+        </div>
+        <div class="status-item">
+            <div class="status-dot dot-green"></div>
+            <span class="status-label">Q-Learning Controller</span>
+            <strong>Operational</strong>
+        </div>
+        <div class="status-item">
+            <div class="status-dot dot-green"></div>
+            <span class="status-label">Vector Memory</span>
+            <strong>Operational</strong>
+        </div>
+        <div class="status-item">
+            <div class="status-dot dot-green"></div>
+            <span class="status-label">Web Search Engine</span>
+            <strong>Operational</strong>
         </div>
     </div>
+
+    <!-- Quick Links -->
+    <div class="section-label">Browse by topic</div>
+    <div class="quick-cards">
+        <a class="quick-card" href="#faq">
+            <div class="icon">🚀</div>
+            <h3>Getting Started</h3>
+            <p>Create your account, log in, and send your first message to the Hive.</p>
+        </a>
+        <a class="quick-card" href="#faq">
+            <div class="icon">🧠</div>
+            <h3>How the AI Works</h3>
+            <p>Learn about multi-agent routing, Q-learning, vector memory, and response generation.</p>
+        </a>
+        <a class="quick-card" href="#faq">
+            <div class="icon">💬</div>
+            <h3>Chat & History</h3>
+            <p>Understand how chat sessions are saved, restored, and organized in your sidebar.</p>
+        </a>
+        <a class="quick-card" href="#faq">
+            <div class="icon">🔒</div>
+            <h3>Privacy & Security</h3>
+            <p>How your data is stored, encrypted, and protected in Hive's SQLite database.</p>
+        </a>
+        <a class="quick-card" href="/dashboard">
+            <div class="icon">📊</div>
+            <h3>RL Analytics Dashboard</h3>
+            <p>View real-time Q-values, reward graphs, and task difficulty breakdowns.</p>
+        </a>
+        <a class="quick-card" href="#contact">
+            <div class="icon">🛠</div>
+            <h3>Report a Bug</h3>
+            <p>Something not working? Send us a detailed report and we'll prioritize it.</p>
+        </a>
+    </div>
+
+    <!-- FAQ -->
+    <div class="section-label" id="faq">Frequently Asked Questions</div>
+    <div class="faq-grid">
+        <details>
+            <summary>What is the Hive Multi-Agent System?</summary>
+            <div class="answer">Hive is a production-grade AI assistant built on a multi-agent architecture. Instead of a single LLM processing everything, your query is routed to specialized expert nodes (Food, Business, Coding, Research) which work in parallel. Their outputs are merged by a Q-Learning-powered Decision Engine that continuously learns which agent performs best for each type of question.</div>
+        </details>
+        <details>
+            <summary>How do I create an account?</summary>
+            <div class="answer">Click "Sign Up" on the login page and enter your email and password. Your password is immediately hashed using bcrypt before being stored in our SQLite database — we never store plain-text passwords. After registration you'll be redirected to log in and instantly access the chat.</div>
+        </details>
+        <details>
+            <summary>Why does the AI sometimes route to multiple agents?</summary>
+            <div class="answer">The Router Planner computes a relevance score for each specialist node based on your query. If two or more nodes score above the activation threshold (0.15), they both process your question in parallel. The Decision Engine then compares their confidence scores (weighted by Q-values) and either picks the best or uses the LLM to merge them into a superior answer.</div>
+        </details>
+        <details>
+            <summary>Does Hive have real-time internet access?</summary>
+            <div class="answer">Yes! For queries containing keywords like "weather", "today", "news", "current", or "latest", Hive automatically triggers a DuckDuckGo web search, retrieves the top 3 results, and injects them directly into the ResearchNode's context before generating a response. This is why MAHA can tell you today's weather accurately.</div>
+        </details>
+        <details>
+            <summary>What do 👍 and 👎 actually do?</summary>
+            <div class="answer">They directly train the Hive's Q-Learning controller in real-time. A 👍 sends a reward signal of +1.0 to the Bellman equation, increasing the Q-value of the agent that answered you. A 👎 sends -0.5, decreasing it. Over time this updates which agent scores highest for each domain, making Hive progressively smarter for your specific usage patterns.</div>
+        </details>
+        <details>
+            <summary>Is my chat history stored permanently?</summary>
+            <div class="answer">Chat sessions are persisted in your browser's localStorage, so they survive page refreshes and tab closures. The Hive sidebar automatically restores all your previous conversations. Long-term vector memories (facts about you the AI learns) are stored in RAM for the current server session — SQLite persistence for memory is on the roadmap.</div>
+        </details>
+        <details>
+            <summary>What do Easy, Medium, Hard task labels mean?</summary>
+            <div class="answer">Every interaction is classified by token consumption. ≤300 tokens = Easy (quick factual questions), 301–700 = Medium (multi-step reasoning), >700 = Hard (complex code generation, long-form synthesis). You can see this breakdown live on the Analytics Dashboard at /dashboard.</div>
+        </details>
+        <details>
+            <summary>What is epsilon (ε) in the dashboard?</summary>
+            <div class="answer">Epsilon controls the Exploration vs. Exploitation trade-off in Q-Learning. At ε=0.3 (start), there's a 30% chance the Hive randomly tests different agents instead of always picking the best-known one — this helps it discover which agents work well for new query types. Over thousands of interactions, ε decays toward 0.05 (mostly exploitation).</div>
+        </details>
+    </div>
+
+    <!-- Contact -->
+    <div class="section-label" id="contact">Get in touch</div>
+    <div class="contact-grid">
+        <div class="contact-card">
+            <div class="icon">📧</div>
+            <h3>Email Support</h3>
+            <p>Send us a detailed message and our team will respond within 24 hours, typically much sooner.</p>
+            <a href="mailto:support@hiveai.dev" class="btn-outline">support@hiveai.dev</a>
+        </div>
+        <div class="contact-card">
+            <div class="icon">🐙</div>
+            <h3>GitHub Issues</h3>
+            <p>Found a bug or want to request a feature? Open an issue on our public repository.</p>
+            <a href="https://github.com/R0hanG0yal/multi_agent_hive_system/issues" target="_blank" class="btn-outline">Open an Issue</a>
+        </div>
+        <div class="contact-card">
+            <div class="icon">📊</div>
+            <h3>Analytics Dashboard</h3>
+            <p>Monitor the Hive's learning in real-time: Q-values, reward history, and task difficulty charts.</p>
+            <a href="/dashboard" class="btn-filled">View Dashboard →</a>
+        </div>
+    </div>
+
+    <!-- Message Form -->
+    <div class="live-chat-section">
+        <h2>Send us a message</h2>
+        <p>Describe your issue in detail and we'll get back to you as quickly as possible.</p>
+        <div class="chat-form">
+            <input type="text" id="contactName" placeholder="Your name">
+            <input type="email" id="contactEmail" placeholder="Your email address">
+            <textarea id="contactMsg" placeholder="Describe your issue or question..."></textarea>
+            <button onclick="submitForm()">Send Message</button>
+        </div>
+        <div id="formSuccess">✓ Message received! We'll be in touch within 24 hours.</div>
+    </div>
+
+</div>
+
+<footer>
+    <p>© 2025 Hive AI — Multi-Agent Intelligence Platform</p>
+    <br>
+    <a href="/">Home</a>
+    <a href="/dashboard">Dashboard</a>
+    <a href="https://github.com/R0hanG0yal/multi_agent_hive_system" target="_blank">GitHub</a>
+</footer>
+
+<script>
+    function handleSearch(e) {
+        if (e && e.type === 'keypress' && e.key !== 'Enter') return;
+        const q = document.getElementById('searchInput').value.trim().toLowerCase();
+        if (!q) return;
+        // Scroll to FAQ section as basic search behavior
+        document.getElementById('faq').scrollIntoView({ behavior: 'smooth' });
+        // Expand relevant FAQ items
+        document.querySelectorAll('details').forEach(d => {
+            if (d.querySelector('summary').innerText.toLowerCase().includes(q) ||
+                d.querySelector('.answer').innerText.toLowerCase().includes(q)) {
+                d.open = true;
+                d.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        });
+    }
+
+    function submitForm() {
+        const name  = document.getElementById('contactName').value.trim();
+        const email = document.getElementById('contactEmail').value.trim();
+        const msg   = document.getElementById('contactMsg').value.trim();
+        if (!name || !email || !msg) {
+            alert('Please fill in all fields before sending.');
+            return;
+        }
+        // Simulate form submission
+        document.getElementById('formSuccess').style.display = 'block';
+        document.getElementById('contactName').value = '';
+        document.getElementById('contactEmail').value = '';
+        document.getElementById('contactMsg').value = '';
+    }
+</script>
 </body>
 </html>

@@ -297,9 +297,7 @@
         <header>
             <h1>✨ Hive AI Assistant</h1>
             <div class="nav-links">
-                <a href="/login">Login</a>
                 <a href="/support">Support</a>
-                <a href="/dev" class="dev-link">Developer</a>
             </div>
         </header>
 
@@ -334,7 +332,6 @@
                 <span style="color: var(--text-secondary); margin-right: 15px; font-size: 0.9rem;">${userEmail}</span>
                 <a href="#" onclick="logout()" style="color: #f28b82;">Logout</a>
                 <a href="/support">Support</a>
-                <a href="/dev" class="dev-link">Developer</a>
             `;
             
             document.getElementById('welcomeBubble').innerText = `Hello ${userEmail.split('@')[0]}! I am your advanced AI assistant powered by the Hive System. How can I help you today?`;
