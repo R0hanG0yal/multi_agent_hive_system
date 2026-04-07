@@ -508,9 +508,99 @@
             bubble.innerHTML = formattedText;
 
             msgDiv.appendChild(avatar);
-            msgDiv.appendChild(bubble);
+            
+            const contentContainer = document.createElement('div');
+            contentContainer.style.display = 'flex';
+            contentContainer.style.flexDirection = 'column';
+            contentContainer.appendChild(bubble);
+
+            // Add Feedback Buttons for AI messages if not a loading indicator
+            if (sender === 'ai' && text.indexOf('<div class="loading-dots">') === -1) {
+                const actionsBar = document.createElement('div');
+                actionsBar.className = 'feedback-bar';
+                actionsBar.style.marginTop = '8px';
+                actionsBar.style.display = 'flex';
+                actionsBar.style.gap = '8px';
+                
+                actionsBar.innerHTML = `
+                    <button onclick="handleFeedback(this, 'up')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='var(--accent-color)';" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='rgba(255,255,255,0.2)';">👍</button>
+                    <button onclick="handleFeedback(this, 'down')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='#f28b82';" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='rgba(255,255,255,0.2)';">👎</button>
+                `;
+                contentContainer.appendChild(actionsBar);
+            }
+
+            msgDiv.appendChild(contentContainer);
             chatContainer.appendChild(msgDiv);
-            if (!isRestore) chatContainer.scrollTop = chatContainer.scrollHeight;
+            if (!isRestore) {
+                setTimeout(() => chatContainer.scrollTop = chatContainer.scrollHeight, 10);
+            }
+        }
+
+        function handleFeedback(btn, type) {
+            const actionsBar = btn.parentElement;
+            if (type === 'up') {
+                actionsBar.innerHTML = '<span style="font-size: 0.8rem; color: var(--accent-color);">Thank you for your feedback! ✓</span>';
+                return;
+            }
+            // If negative feedback, ask for reasoning directly in the UI
+            actionsBar.innerHTML = `
+                <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
+                    <input type="text" placeholder="What was wrong with the response?" style="flex:1; padding: 6px 10px; background: #131314; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; outline:none; font-size: 0.85rem;" onkeypress="if(event.key==='Enter'){submitFeedback(this)}">
+                    <button onclick="submitFeedback(this)" style="background: var(--accent-color); color: #000; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 500;">Regenerate</button>
+                </div>
+            `;
+        }
+
+        async function submitFeedback(element) {
+            // Find input element whether button or input itself triggered this
+            const inputEl = element.tagName === 'INPUT' ? element : element.previousElementSibling;
+            const feedbackText = inputEl.value.trim();
+            if(!feedbackText) return;
+
+            const actionsBar = inputEl.parentElement.parentElement;
+            const contentContainer = actionsBar.parentElement;
+            const bubbleDiv = contentContainer.querySelector('.bubble');
+            const originalAIResponse = bubbleDiv.innerText;
+
+            actionsBar.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-secondary);">Regenerating with feedback...</span>';
+
+            // Send feedback as an explicit command
+            const feedbackQuery = `[USER FEEDBACK REGENERATION REQUEST]: The user provided negative feedback: "${feedbackText}". Please critically review your previous statement and generate a completely updated, corrected response addressing this feedback.`;
+            
+            // Immediately track user feedback request
+            chatHistory.push({ role: 'user', content: feedbackQuery });
+            saveStateToLocal();
+            
+            // Render user feedback context
+            appendMessage('user', `Feedback submitted: "${feedbackText}"`);
+
+            // Fetch new response
+            const loadingId = 'loading-' + Date.now();
+            appendLoading(loadingId);
+
+            try {
+                const historyForApi = chatHistory.slice(0, -1);
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: feedbackQuery, history: historyForApi })
+                });
+                
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+                actionsBar.parentElement.removeChild(actionsBar); // remove feedback bar
+
+                if (data.error) {
+                    appendMessage('ai', 'Error: ' + data.error);
+                } else {
+                    appendMessage('ai', data.response);
+                    chatHistory.push({ role: 'assistant', content: data.response });
+                    saveStateToLocal();
+                }
+            } catch (err) {
+                if (document.getElementById(loadingId)) document.getElementById(loadingId).remove();
+                actionsBar.innerHTML = '<span style="font-size: 0.8rem; color: #f28b82;">Failed to regenerate. Connection error.</span>';
+            }
         }
 
         function appendLoading(id) {
