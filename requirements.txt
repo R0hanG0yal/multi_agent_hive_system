@@ -1,0 +1,7 @@
+pydantic
+pytest
+openai
+requests
+sentence-transformers
+transformers
+numpy

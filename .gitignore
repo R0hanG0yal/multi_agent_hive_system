@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Env
+.venv/
+env/
+venv/
+.env
+
+# Pytest
+.pytest_cache/
+
+# VSCode
+.vscode/
+
+# Mac
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Distribution
+build/
+dist/
+*.egg-info/
+
+# OneDrive temp
+Thumbs.db
+Desktop.ini
