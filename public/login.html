@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive AI - Login</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --surface-color: #1e1f20;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent-color: #a8c7fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .login-card {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .login-card h1 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            font-weight: 500;
+        }
+
+        .login-card p {
+            color: var(--text-secondary);
+            margin-bottom: 32px;
+        }
+
+        .google-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            background-color: #ffffff;
+            color: #3c4043;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 24px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            width: 100%;
+            transition: background-color 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+        }
+
+        .google-btn:hover {
+            background-color: #f8f9fa;
+            box-shadow: 0 1px 3px rgba(60,64,67,0.3);
+        }
+
+        .google-btn img {
+            width: 24px;
+            height: 24px;
+        }
+        
+        .footer-links {
+            margin-top: 24px;
+            font-size: 0.85rem;
+        }
+        
+        .footer-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        .input-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: #131314;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .submit-btn {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 8px;
+            margin-bottom: 16px;
+            transition: 0.2s;
+        }
+
+        .submit-btn:hover {
+            background-color: #d3e3fd;
+        }
+
+        .error-msg {
+            color: #f28b82;
+            font-size: 0.85rem;
+            margin-top: 8px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .divider {
+            margin: 24px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .divider span {
+            background: var(--surface-color);
+            padding: 0 10px;
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>✨ Hive AI</h1>
+        <p>Sign in to access your memory-augmented assistant and synced chat history.</p>
+        
+        <div class="error-msg" id="errorMsg"></div>
+
+        <form id="loginForm" onsubmit="handleRealLogin(event)">
+            <div class="input-group">
+                <label>Email</label>
+                <input type="email" id="emailInput" required>
+            </div>
+            
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="passwordInput" required>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">Login</button>
+        </form>
+
+        <div class="divider"><span>OR</span></div>
+
+        <!-- Interactive login button that triggers the modal -->
+        <button onclick="openGoogleModal()" class="google-btn" id="googleBtn">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google Logo">
+            <span>Sign in with Google</span>
+        </button>
+        
+        <div class="footer-links">
+            <a href="/signup">Don't have an account? Sign up</a><br><br>
+            <a href="/support">Need Help? Visit Support</a>
+        </div>
+    </div>
+
+    <!-- The Mock Google Login Modal -->
+    <div id="googleModalOverlay" class="modal-overlay">
+        <!-- Omitted for brevity in edit -->
+        <div class="google-modal">
+            <div class="g-header">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/2/2f/Google_2015_logo.svg" alt="Google">
+                <h2>Sign in</h2>
+                <p>Use your Google Account</p>
+            </div>
+            <div class="g-body">
+                <input type="email" id="gEmail" placeholder="Email or phone" class="g-input">
+                <p class="g-disclaimer">Not your computer? Use Guest mode to sign in privately.</p>
+            </div>
+            <div class="g-footer">
+                <button class="g-next-btn" onclick="openGoogleModal(false)">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function handleRealLogin(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            const btn = document.getElementById('submitBtn');
+            const errorMsg = document.getElementById('errorMsg');
+            
+            errorMsg.style.display = 'none';
+            btn.innerText = 'Authenticating...';
+            btn.style.pointerEvents = 'none';
+
+            try {
+                const response = await fetch('/api/login_user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    errorMsg.innerText = data.error;
+                    errorMsg.style.display = 'block';
+                    btn.innerText = 'Login';
+                    btn.style.pointerEvents = 'auto';
+                } else {
+                    // Success! Save JWT and redirect
+                    localStorage.setItem('hive_jwt', data.token);
+                    localStorage.setItem('hive_email', data.email);
+                    btn.innerText = 'Success! Accessing Hive...';
+                    setTimeout(() => window.location.href = '/', 1000);
+                }
+            } catch (err) {
+                errorMsg.innerText = 'Network error. Make sure server is running.';
+                errorMsg.style.display = 'block';
+                btn.innerText = 'Login';
+                btn.style.pointerEvents = 'auto';
+            }
+        }
+
+        function openGoogleModal(show = true) {
+            document.getElementById('googleModalOverlay').style.display = show ? 'flex' : 'none';
+            if (show) {
+                alert("Google Sign-In requires a Google Developer Console Client ID. Use Local Email/Password authentication instead for production environments.");
+                document.getElementById('googleModalOverlay').style.display = 'none';
+            }
+        }
+    </script>
+    <style>
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); align-items: center; justify-content: center; z-index: 1000; }
+        .google-modal { background: #fff; color: #202124; max-width: 448px; width: 100%; border-radius: 8px; padding: 48px 40px 36px; box-sizing: border-box; text-align: left; }
+        .g-header { text-align: center; margin-bottom: 30px; }
+        .g-header img { width: 75px; margin-bottom: 16px; }
+        .g-header h2 { font-weight: 400; font-size: 24px; margin: 0 0 8px; }
+        .g-input { width: 100%; padding: 13px 15px; font-size: 16px; border: 1px solid #dadce0; border-radius: 4px; box-sizing: border-box; }
+        .g-next-btn { background: #1a73e8; color: #fff; border: none; padding: 0 24px; border-radius: 4px; height: 36px; font-size: 14px; font-weight: 500; cursor: pointer; }
+    </style>
+</body>
+</html>

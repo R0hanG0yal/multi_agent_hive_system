@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive AI - Sign Up</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --surface-color: #1e1f20;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent-color: #a8c7fa;
+            --error-color: #f28b82;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        .login-card {
+            background-color: var(--surface-color);
+            padding: 40px;
+            border-radius: 24px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 100%;
+            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .login-card h1 {
+            margin-top: 0;
+            font-size: 1.8rem;
+            font-weight: 500;
+        }
+
+        .login-card p {
+            color: var(--text-secondary);
+            margin-bottom: 24px;
+        }
+
+        .input-group {
+            margin-bottom: 16px;
+            text-align: left;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 12px 16px;
+            background-color: #131314;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 1rem;
+            box-sizing: border-box;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        .input-group input:focus {
+            border-color: var(--accent-color);
+        }
+
+        .submit-btn {
+            background-color: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 16px;
+            transition: 0.2s;
+        }
+
+        .submit-btn:hover {
+            background-color: #d3e3fd;
+        }
+
+        .error-msg {
+            color: var(--error-color);
+            font-size: 0.85rem;
+            margin-top: 8px;
+            display: none;
+        }
+
+        .footer-links {
+            margin-top: 24px;
+            font-size: 0.85rem;
+        }
+        
+        .footer-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+        }
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            margin: 24px 0;
+            border-top: 1px solid rgba(255,255,255,0.1);
+            position: relative;
+        }
+
+        .divider span {
+            background: var(--surface-color);
+            padding: 0 10px;
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-card">
+        <h1>✨ Create Account</h1>
+        <p>Register to secure your Memory-Augmented Hive Assistant data.</p>
+        
+        <div class="error-msg" id="errorMsg"></div>
+
+        <form id="signupForm" onsubmit="handleSignup(event)">
+            <div class="input-group">
+                <label>Email</label>
+                <input type="email" id="emailInput" required>
+            </div>
+            
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="passwordInput" required>
+            </div>
+
+            <button type="submit" class="submit-btn" id="submitBtn">Sign Up</button>
+        </form>
+
+        <div class="footer-links">
+            <span>Already have an account?</span> <a href="/login">Login here</a>
+        </div>
+    </div>
+
+    <script>
+        async function handleSignup(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('emailInput').value;
+            const password = document.getElementById('passwordInput').value;
+            const btn = document.getElementById('submitBtn');
+            const errorMsg = document.getElementById('errorMsg');
+            
+            errorMsg.style.display = 'none';
+            btn.innerText = 'Creating Secure Environment...';
+            btn.style.pointerEvents = 'none';
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    errorMsg.innerText = data.error;
+                    errorMsg.style.display = 'block';
+                    btn.innerText = 'Sign Up';
+                    btn.style.pointerEvents = 'auto';
+                } else {
+                    // Success! Redirect to login
+                    btn.innerText = 'Success! Redirecting...';
+                    setTimeout(() => window.location.href = '/login', 1000);
+                }
+            } catch (err) {
+                errorMsg.innerText = 'Network error. Make sure server is running.';
+                errorMsg.style.display = 'block';
+                btn.innerText = 'Sign Up';
+                btn.style.pointerEvents = 'auto';
+            }
+        }
+    </script>
+</body>
+</html>

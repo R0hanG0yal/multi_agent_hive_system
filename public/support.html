@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive AI - Support</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --surface-color: #1e1f20;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent-color: #a8c7fa;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            background-color: var(--surface-color);
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .nav-links a {
+            color: var(--accent-color);
+            text-decoration: none;
+            margin-left: 16px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 60px auto;
+            padding: 0 24px;
+        }
+
+        h2 {
+            font-weight: 500;
+            margin-top: 40px;
+        }
+
+        .faq-box {
+            background-color: var(--surface-color);
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .faq-box h3 {
+            margin-top: 0;
+            color: var(--accent-color);
+        }
+
+        .faq-box p {
+            color: var(--text-secondary);
+            line-height: 1.6;
+            margin-bottom: 0;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>✨ Hive AI Support</h1>
+        <div class="nav-links">
+            <a href="/">Back to Chat</a>
+            <a href="/login">Login</a>
+        </div>
+    </header>
+
+    <div class="container">
+        <h2>How can we help you?</h2>
+        
+        <div class="faq-box">
+            <h3>How does the AI remember things?</h3>
+            <p>Hive Assistant uses an advanced vector semantic search engine and a rolling context window to safely and securely remember things you tell it, like your name, preferences, or tasks!</p>
+        </div>
+
+        <div class="faq-box">
+            <h3>Is my data secure?</h3>
+            <p>Yes. Your memories are currently cached locally in the environment. All data operates under strict boundaries defined by your autonomous system deployment.</p>
+        </div>
+
+        <div class="faq-box">
+            <h3>How do I link my Google account?</h3>
+            <p>Go to the Login page and click 'Sign in with Google'. This will synchronize your persistent memory banks across all your devices once the production database is connected.</p>
+        </div>
+    </div>
+</body>
+</html>

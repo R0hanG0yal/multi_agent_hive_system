@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OpenEnv: Memory-Augmented Assistant</title>
+    <style>
+        :root {
+            --primary: #8b5cf6;
+            --secondary: #6d28d9;
+            --bg: #0c0a09;
+            --card-bg: #1c1917;
+            --text-main: #fafaf9;
+            --text-sub: #a8a29e;
+            --accent: #10b981;
+            --warning: #f59e0b;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .header {
+            padding: 20px 40px;
+            background: rgba(28, 25, 23, 0.8);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h2 { font-size: 1.25rem; margin-top: 0; color: var(--primary); }
+
+        .obs-box, .memory-box {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .memory-tag {
+            display: inline-block;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--accent);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            margin-right: 8px;
+            margin-bottom: 8px;
+        }
+
+        .input-group {
+            margin-top: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        textarea {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: white;
+            padding: 12px;
+            resize: none;
+            height: 100px;
+        }
+
+        .actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        button {
+            flex: 1;
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        button:hover { background: var(--secondary); transform: translateY(-2px); }
+
+        .reward-log {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .log-entry {
+            background: rgba(255,255,255,0.03);
+            padding: 12px;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .score-badge {
+            float: right;
+            background: var(--accent);
+            color: black;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .status-bar {
+            background: #1c1917;
+            padding: 10px 40px;
+            font-size: 0.8rem;
+            color: var(--text-sub);
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1 style="font-size: 1.5rem; margin: 0;">OpenEnv Assistant Framework</h1>
+        <button onclick="resetEnv()" style="width: auto; padding: 8px 20px; background: transparent; border: 1px solid var(--primary);">Full Reset</button>
+    </div>
+
+    <div class="main">
+        <!-- Environment Observation Panel -->
+        <div class="card">
+            <h2>Current Observation</h2>
+            <div id="taskInfo" class="obs-box">
+                <div style="font-weight: bold; margin-bottom: 4px;" id="taskIdDisplay">...</div>
+                <div id="instructionDisplay" style="color: var(--text-sub);">Loading environment...</div>
+            </div>
+
+            <h2>Retrieved Memory</h2>
+            <div id="memoryDisplay" class="memory-box">
+                <span class="text-sub">No memories retrieved for this task yet.</span>
+            </div>
+
+            <div class="input-group">
+                <div style="font-size: 0.9rem; margin-bottom: 4px;">Agent Response (Production Action):</div>
+                <textarea id="actionInput" placeholder="Enter output based on instruction and memory..."></textarea>
+                <div style="font-size: 0.9rem; margin-bottom: 4px;">Memory Update (Optional):</div>
+                <input type="text" id="memoryUpdateInput" placeholder="Store new fact..." style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: white; padding: 12px;">
+                <div class="actions">
+                    <button onclick="takeStep()">Execute Step()</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Reward & Self-Improvement Panel -->
+        <div class="card">
+            <h2>Reward Feed & Performance</h2>
+            <div id="rewardLog" class="reward-log">
+                <div class="text-sub">Awaiting first action...</div>
+            </div>
+            
+            <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.05);">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span>Cumulative Improvement Bonus</span>
+                    <span id="totalBonus" style="color: var(--accent); font-weight: bold;">+0.00</span>
+                </div>
+                <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px;">
+                    <div id="improvementBar" style="height: 100%; background: var(--primary); width: 0%; transition: 0.5s;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="status-bar">
+        <span>Environment Version: 1.0.0</span> | <span>OpenEnv Specification: 0.1.0</span> | <span id="envStatus">STATUS: ACTIVE</span>
+    </div>
+
+    <script>
+        let currentObs = null;
+        let totalBonus = 0;
+
+        async function resetEnv() {
+            const resp = await fetch('/api/reset');
+            currentObs = await resp.json();
+            updateUI();
+            document.getElementById('rewardLog').innerHTML = '<div class="text-sub">Environment reset. Awaiting evaluation.</div>';
+            totalBonus = 0;
+            document.getElementById('totalBonus').innerText = '+0.00';
+            document.getElementById('improvementBar').style.width = '0%';
+        }
+
+        async function takeStep() {
+            const response = document.getElementById('actionInput').value;
+            const memoryUpdate = document.getElementById('memoryUpdateInput').value;
+            
+            if (!response && !memoryUpdate) {
+                alert("Action response or memory update must be provided.");
+                return;
+            }
+
+            const stepData = {
+                response: response || "",
+                decision_type: "production",
+                memory_update: memoryUpdate || null
+            };
+
+            const btn = document.querySelector('button[onclick="takeStep()"]');
+            btn.innerHTML = 'Processing...';
+            btn.disabled = true;
+
+            try {
+                const resp = await fetch('/api/step', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(stepData)
+                });
+
+                const data = await resp.json();
+                currentObs = data.observation;
+                addLogEntry(data.reward);
+                updateUI();
+
+                if (data.done) {
+                    document.getElementById('envStatus').innerText = 'STATUS: EPISODE COMPLETE';
+                    alert('Simulation Finished! Final Performance: ' + data.state.performance_history);
+                }
+            } catch (err) {
+                console.error(err);
+                alert("Step failed. Check server logs.");
+            } finally {
+                btn.innerHTML = 'Execute Step()';
+                btn.disabled = false;
+                document.getElementById('actionInput').value = '';
+                document.getElementById('memoryUpdateInput').value = '';
+            }
+        }
+
+        function updateUI() {
+            document.getElementById('taskIdDisplay').innerText = 'TASK ID: ' + currentObs.task_id;
+            document.getElementById('instructionDisplay').innerText = currentObs.instruction;
+            
+            const memBox = document.getElementById('memoryDisplay');
+            if (currentObs.retrieved_memories && currentObs.retrieved_memories.length > 0) {
+                memBox.innerHTML = currentObs.retrieved_memories.map(m => `
+                    <div class="memory-tag">${m.content}</div>
+                `).join('');
+            } else {
+                memBox.innerHTML = '<span class="text-sub">No memories retrieved for this task yet.</span>';
+            }
+        }
+
+        function addLogEntry(reward) {
+            const log = document.getElementById('rewardLog');
+            if (log.querySelector('.text-sub')) log.innerHTML = '';
+
+            totalBonus += reward.improvement_bonus;
+            document.getElementById('totalBonus').innerText = '+' + totalBonus.toFixed(2);
+            document.getElementById('improvementBar').style.width = Math.min(100, (totalBonus * 100)) + '%';
+
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `
+                <span class="score-badge">${reward.score.toFixed(2)}</span>
+                <div style="font-weight: 600;">${reward.explanation}</div>
+                <div style="color: var(--text-sub); font-size: 0.8rem; margin-top: 4px;">
+                    Correctness: ${reward.correctness} | Memory: ${reward.memory_utility} | Bonus: ${reward.improvement_bonus}
+                </div>
+            `;
+            log.prepend(entry);
+        }
+
+        // Initialize
+        resetEnv();
+    </script>
+</body>
+</html>

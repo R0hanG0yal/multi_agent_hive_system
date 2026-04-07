@@ -1,0 +1,8 @@
+name: Memory-Augmented Self-Improving Assistant
+version: 1.0.0
+description: A production-grade OpenEnv assistant environment with memory and self-improvement loops.
+author: Antigravity AI
+license: MIT
+tags: ["openenv", "memory", "self-improvement", "assistant"]
+entry_point: src.env.assistant_env:MemoryAugmentedAssistantEnv
+specification_version: 0.1.0

@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hive AI - Assistant</title>
+    <style>
+        :root {
+            --bg-color: #131314;
+            --surface-color: #1e1f20;
+            --surface-hover: #282a2c;
+            --text-primary: #e3e3e3;
+            --text-secondary: #c4c7c5;
+            --accent-color: #a8c7fa;
+            --user-bubble: #004a77;
+            --ai-bubble: #1e1f20;
+            --sidebar-width: 260px;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            width: var(--sidebar-width);
+            background-color: var(--surface-color);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            box-sizing: border-box;
+        }
+
+        .new-chat-btn {
+            background-color: transparent;
+            color: var(--text-primary);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 12px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 24px;
+            transition: 0.2s;
+        }
+
+        .new-chat-btn:hover {
+            background-color: rgba(255,255,255,0.05);
+        }
+
+        .history-list {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            color: var(--text-secondary);
+            padding: 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            transition: background 0.2s;
+        }
+
+        .history-item:hover {
+            background-color: var(--surface-hover);
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        header {
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        header h1 {
+            font-size: 1.2rem;
+            margin: 0;
+            font-weight: 500;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--accent-color);
+        }
+
+        .dev-link {
+            color: var(--accent-color) !important;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(168, 199, 250, 0.1);
+        }
+
+        .dev-link:hover {
+            background: rgba(168, 199, 250, 0.2);
+        }
+
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .message {
+            display: flex;
+            gap: 16px;
+            max-width: 85%;
+        }
+
+        .message.user {
+            align-self: flex-end;
+            flex-direction: row-reverse;
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .user .avatar {
+            background-color: var(--accent-color);
+            color: #000;
+        }
+
+        .ai .avatar {
+            background: linear-gradient(135deg, #a8c7fa, #d3e3fd);
+            color: #000;
+        }
+
+        .bubble {
+            padding: 12px 18px;
+            border-radius: 18px;
+            line-height: 1.5;
+            font-size: 1rem;
+        }
+
+        .user .bubble {
+            background-color: var(--user-bubble);
+            border-bottom-right-radius: 4px;
+        }
+
+        .ai .bubble {
+            background-color: var(--ai-bubble);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-bottom-left-radius: 4px;
+        }
+
+        .input-area {
+            padding: 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .input-wrapper {
+            position: relative;
+            background-color: var(--surface-color);
+            border-radius: 24px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: flex-end;
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: 0.2s;
+        }
+
+        .input-wrapper:focus-within {
+            background-color: #282a2c;
+            border-color: var(--accent-color);
+        }
+
+        textarea {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 1rem;
+            resize: none;
+            padding: 8px 0;
+            max-height: 200px;
+            min-height: 24px;
+            outline: none;
+        }
+
+        textarea::placeholder {
+            color: var(--text-secondary);
+        }
+
+        .send-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .send-btn:hover {
+            background: rgba(255,255,255,0.1);
+            color: var(--accent-color);
+        }
+
+        .send-btn svg {
+            width: 24px;
+            height: 24px;
+            fill: currentColor;
+        }
+
+        .loading-dots {
+            display: flex;
+            gap: 4px;
+            padding: 8px 0;
+        }
+
+        .dot {
+            width: 6px;
+            height: 6px;
+            background-color: var(--text-secondary);
+            border-radius: 50%;
+            animation: bounce 1.4s infinite ease-in-out both;
+        }
+
+        .dot:nth-child(1) { animation-delay: -0.32s; }
+        .dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <button class="new-chat-btn" onclick="startNewChat()">
+            <svg xmlns="http://www.w3.org/2000/svg" height="24" viewBox="0 -960 960 960" width="24" fill="currentColor"><path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z"/></svg>
+            New chat
+        </button>
+        <div class="history-list" id="historyList">
+            <!-- Dynamic history items will spawn here -->
+        </div>
+    </div>
+
+    <div class="main-content">
+        <header>
+            <h1>✨ Hive AI Assistant</h1>
+            <div class="nav-links">
+                <a href="/login">Login</a>
+                <a href="/support">Support</a>
+                <a href="/dev" class="dev-link">Developer</a>
+            </div>
+        </header>
+
+        <div class="chat-container" id="chatContainer">
+            <div class="message ai" id="welcomeMessage">
+                <div class="avatar">✨</div>
+                <div class="bubble" id="welcomeBubble">Hello! I am your advanced AI assistant powered by the Hive System. How can I help you today?</div>
+            </div>
+        </div>
+
+    <div class="input-area">
+        <div class="input-wrapper">
+            <textarea id="userInput" placeholder="Enter a prompt here..." rows="1" oninput="this.style.height = '';this.style.height = this.scrollHeight + 'px'"></textarea>
+            <button class="send-btn" onclick="sendMessage()">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Production Grade Authentication Guard
+        const token = localStorage.getItem('hive_jwt');
+        const userEmail = localStorage.getItem('hive_email');
+        if (!token) {
+            window.location.href = '/login';
+        }
+
+        // Initialize user data
+        if (userEmail) {
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.innerHTML = `
+                <span style="color: var(--text-secondary); margin-right: 15px; font-size: 0.9rem;">${userEmail}</span>
+                <a href="#" onclick="logout()" style="color: #f28b82;">Logout</a>
+                <a href="/support">Support</a>
+                <a href="/dev" class="dev-link">Developer</a>
+            `;
+            
+            document.getElementById('welcomeBubble').innerText = `Hello ${userEmail.split('@')[0]}! I am your advanced AI assistant powered by the Hive System. How can I help you today?`;
+        }
+
+        function logout() {
+            localStorage.removeItem('hive_jwt');
+            localStorage.removeItem('hive_email');
+            window.location.href = '/login';
+        }
+
+        const input = document.getElementById('userInput');
+        const chatContainer = document.getElementById('chatContainer');
+        const historyList = document.getElementById('historyList');
+        const welcomeMessageHTML = document.getElementById('welcomeMessage').outerHTML;
+        
+        let chatHistory = JSON.parse(localStorage.getItem('hive_chat_history')) || [];
+        let savedSessions = JSON.parse(localStorage.getItem('hive_sessions')) || [];
+        let currentChatId = localStorage.getItem('hive_current_id') || Date.now();
+
+        // Initialize view on load
+        function initChatState() {
+            renderSidebar();
+            if (chatHistory.length > 0) {
+                // Restore active chat DOM manually since JSON doesn't store HTML
+                chatContainer.innerHTML = welcomeMessageHTML;
+                chatHistory.forEach(msg => appendMessage(msg.role, msg.content, true));
+            }
+        }
+
+        function saveStateToLocal() {
+            localStorage.setItem('hive_chat_history', JSON.stringify(chatHistory));
+            localStorage.setItem('hive_sessions', JSON.stringify(savedSessions));
+            localStorage.setItem('hive_current_id', currentChatId);
+        }
+
+        function startNewChat() {
+            // Save if there is any user interaction
+            if (chatHistory.length > 0) {
+                const existingIndex = savedSessions.findIndex(s => s.id === currentChatId.toString());
+                let title = chatHistory[0].content;
+                if (title.length > 25) title = title.substring(0, 25) + '...';
+                
+                if (existingIndex === -1) {
+                    savedSessions.push({
+                        id: currentChatId.toString(),
+                        title: title,
+                        history: [...chatHistory],
+                        html: chatContainer.innerHTML
+                    });
+                } else {
+                    savedSessions[existingIndex].history = [...chatHistory];
+                    savedSessions[existingIndex].html = chatContainer.innerHTML;
+                }
+                renderSidebar();
+            }
+
+            chatContainer.innerHTML = welcomeMessageHTML;
+            chatHistory = [];
+            currentChatId = Date.now().toString();
+            saveStateToLocal();
+        }
+
+        function restoreChat(id) {
+            // Implicitly save current chat before switching
+            if (chatHistory.length > 0 && currentChatId) {
+                const existingIndex = savedSessions.findIndex(s => s.id === currentChatId.toString());
+                let title = chatHistory[0].content;
+                if (title.length > 25) title = title.substring(0, 25) + '...';
+                
+                if (existingIndex === -1) {
+                    savedSessions.push({
+                        id: currentChatId.toString(),
+                        title: title,
+                        history: [...chatHistory],
+                        html: chatContainer.innerHTML
+                    });
+                } else {
+                    savedSessions[existingIndex].history = [...chatHistory];
+                    savedSessions[existingIndex].html = chatContainer.innerHTML;
+                }
+            }
+
+            // Restore the clicked session
+            const session = savedSessions.find(s => s.id === id);
+            if (session) {
+                chatContainer.innerHTML = session.html;
+                chatHistory = [...session.history];
+                currentChatId = session.id;
+                saveStateToLocal();
+            }
+            renderSidebar();
+        }
+
+        function renderSidebar() {
+            historyList.innerHTML = '';
+            // Render in reverse chronological order so newest is at the top
+            [...savedSessions].reverse().forEach(session => {
+                const div = document.createElement('div');
+                div.className = 'history-item';
+                div.innerHTML = `💬 ${session.title}`;
+                div.onclick = () => restoreChat(session.id);
+                historyList.appendChild(div);
+            });
+        }
+
+        input.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Immediately track user message
+            chatHistory.push({ role: 'user', content: text });
+            saveStateToLocal();
+            appendMessage('user', text);
+            input.value = '';
+            input.style.height = 'auto';
+
+            // Show loading
+            const loadingId = 'loading-' + Date.now();
+            appendLoading(loadingId);
+
+            try {
+                // Determine what to send to Groq (we exclude the very last user message because we pass it as 'text')
+                const historyForApi = chatHistory.slice(0, -1);
+                
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        text: text,
+                        history: historyForApi
+                    })
+                });
+                
+                const data = await response.json();
+                document.getElementById(loadingId).remove();
+
+                if (data.error) {
+                    appendMessage('ai', 'Error: ' + data.error);
+                } else {
+                    appendMessage('ai', data.response);
+                    chatHistory.push({ role: 'assistant', content: data.response });
+                    saveStateToLocal();
+                }
+
+            } catch (err) {
+                document.getElementById(loadingId).remove();
+                appendMessage('ai', 'Connection error. Make sure the server is running.');
+            }
+        }
+
+        function appendMessage(sender, text, isRestore=false) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `message ${sender}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerText = sender === 'user' ? 'U' : '✨';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            // Simple markdown parsing
+            let formattedText = text.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            bubble.innerHTML = formattedText;
+
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(bubble);
+            chatContainer.appendChild(msgDiv);
+            if (!isRestore) chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        function appendLoading(id) {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message ai';
+            msgDiv.id = id;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerText = '✨';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = '<div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(bubble);
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        // Boot
+        initChatState();
+    </script>
+    </div> <!-- End main-content -->
+</body>
+</html>
