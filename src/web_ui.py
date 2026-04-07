@@ -55,23 +55,23 @@ def get_search_results(query: str) -> str:
 
 
 # ─── Request/Response Schemas ─────────────────────────────────────────────────
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 class ChatRequest(BaseModel):
     text: str
     history: List[Dict[str, str]] = []
+    user_name: Optional[str] = ""   # Injected from localStorage on the frontend
 
 class FeedbackRequest(BaseModel):
     feedback: str  # 'positive' | 'negative'
 
 
-# ─── Chat Endpoint (Main Pipeline) ────────────────────────────────────────────
+# ─── Chat Endpoint — Non-streaming fallback ─────────────────────────────────
 @app.post("/api/chat")
 async def chat_endpoint(request: ChatRequest):
     if not groq_client:
         return {"error": "Groq client not initialized. Set GROQ_API_KEY environment variable."}
 
-    # Check if query needs live internet data
     needs_search = any(kw in request.text.lower() for kw in SEARCH_KEYWORDS)
     search_results = get_search_results(request.text) if needs_search else ""
 
@@ -79,13 +79,63 @@ async def chat_endpoint(request: ChatRequest):
         result = orchestrator.process(
             query=request.text,
             chat_history=request.history,
-            search_results=search_results
+            search_results=search_results,
+            user_name=request.user_name
         )
         return result
     except Exception as e:
         print(f"[Orchestrator ERROR]: {e}")
         import traceback; traceback.print_exc()
         return {"error": str(e)}
+
+
+# ─── Streaming Chat Endpoint — Gemini-style token-by-token ───────────────────
+import json
+from fastapi.responses import StreamingResponse
+
+@app.post("/api/chat/stream")
+async def chat_stream(request: ChatRequest):
+    """Server-Sent Events endpoint. Streams tokens as they are generated."""
+    if not groq_client:
+        async def err(): yield 'data: {"error": "Groq not initialized"}\n\n'
+        return StreamingResponse(err(), media_type="text/event-stream")
+
+    needs_search = any(kw in request.text.lower() for kw in SEARCH_KEYWORDS)
+    search_results = get_search_results(request.text) if needs_search else ""
+
+    # Run the routing + decision pipeline (fast, non-LLM parts)
+    routing_meta = orchestrator.prepare_stream(
+        query=request.text,
+        chat_history=request.history,
+        search_results=search_results,
+        user_name=request.user_name
+    )
+
+    async def generate():
+        full_response = ""
+        try:
+            stream = groq_client.chat.completions.create(
+                messages=routing_meta["messages"],
+                model="llama-3.1-8b-instant",
+                temperature=0.72,
+                max_tokens=700,
+                stream=True
+            )
+            for chunk in stream:
+                token = chunk.choices[0].delta.content
+                if token:
+                    full_response += token
+                    yield f"data: {json.dumps({'token': token})}\n\n"
+
+            # After stream ends, send metadata
+            orchestrator.finalize_stream(request.text, full_response, routing_meta)
+            yield f"data: {json.dumps({'done': True, 'hive_meta': routing_meta['hive_meta']})}\n\n"
+
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(generate(), media_type="text/event-stream",
+                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ─── Feedback Endpoint (RL Reward Node) ───────────────────────────────────────

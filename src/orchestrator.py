@@ -54,97 +54,115 @@ class HiveOrchestrator:
         self,
         query: str,
         chat_history: list,
-        search_results: str = ""
+        search_results: str = "",
+        user_name: str = ""
+    ) -> dict:
+        """Full multi-agent pipeline (non-streaming). Returns complete response dict."""
+        routing_meta = self.prepare_stream(query, chat_history, search_results, user_name)
+        try:
+            completion = self.groq_client.chat.completions.create(
+                messages=routing_meta["messages"],
+                model="llama-3.1-8b-instant",
+                temperature=0.72,
+                max_tokens=700
+            )
+            response_text = completion.choices[0].message.content
+        except Exception as e:
+            response_text = f"I encountered an issue generating a response: {e}"
+
+        self.finalize_stream(query, response_text, routing_meta)
+        return {"response": response_text, "hive_meta": routing_meta["hive_meta"]}
+
+    def prepare_stream(
+        self,
+        query: str,
+        chat_history: list,
+        search_results: str = "",
+        user_name: str = ""
     ) -> dict:
         """
-        Full multi-agent pipeline. Returns a dict suitable for the API response.
+        Runs all non-LLM pipeline steps and returns the message list
+        ready for Groq streaming, plus hive_meta for the response.
         """
-        # ── 1. Retrieve relevant memories (Shared Knowledge Space seeding) ──
+        # ── 1. Memory retrieval ───────────────────────────────────────────────
         memories = self.memory.retrieve(query, top_k=3)
         memory_context = "\n".join([f"- {m.content}" for m in memories])
 
-        # ── 2. Router Planner ────────────────────────────────────────────────
+        # ── 2. Router Planner ─────────────────────────────────────────────────
         has_search = bool(search_results.strip())
-        specialist_nodes, memory_node = route(query, has_search_data=has_search)
-
-        # Determine primary routing state for RL
+        specialist_nodes, _ = route(query, has_search_data=has_search)
         routing_state = specialist_nodes[0].domain if specialist_nodes else "general"
         routing_debug = describe_routing(query)
 
-        # ── 3. Q-Learning weights for this state ─────────────────────────────
+        # ── 3. Q-Learning weights ─────────────────────────────────────────────
         q_weights = self.rl_controller.get_weights(routing_state)
 
-        # ── 4. Run Memory Agent (always, fast) ───────────────────────────────
-        memory_output: AgentOutput = memory_node.process(
-            query, memory_context, self.groq_client, chat_history
+        # ── 4. Pick best agent (highest Q-weighted relevance) ─────────────────
+        best_node = specialist_nodes[0]
+        best_score = 0.0
+        for node in specialist_nodes:
+            score = node.relevance_score(query) * q_weights.get(node.name, 1.0)
+            if score > best_score:
+                best_score = score
+                best_node = node
+
+        # ── 5. Build name-aware system prompt ────────────────────────────────
+        name_line = f"The user's name is {user_name}. Always address them by name naturally in conversation. " if user_name else ""
+        memory_line = f"\nRelevant personal context from memory:\n{memory_context}" if memory_context else ""
+        search_line = f"\n\n[LIVE SEARCH DATA — USE THIS]:\n{search_results}" if search_results else ""
+
+        # Select node-specific personality prompt
+        node_prompts = {
+            "FoodNode":     "You are MAHA, a warm and knowledgeable food & nutrition expert. Speak like a brilliant friend — engaging, practical, and enthusiastic.",
+            "BusinessNode": "You are MAHA, a sharp business mentor. Be direct, insightful, and end with an actionable tip. Avoid corporate jargon.",
+            "CodingNode":   "You are MAHA, a skilled software engineer and patient mentor. Use markdown code blocks. Empathise, then fix. Offer to explore edge cases.",
+            "ResearchNode": "You are MAHA, a curious research expert. Share findings conversationally as if excited. Never say 'As an AI' or 'I cannot'.",
+        }
+        base_prompt = node_prompts.get(best_node.name, "You are MAHA, a helpful and warm AI assistant.")
+
+        system_prompt = (
+            f"{base_prompt} "
+            f"{name_line}"
+            f"Respond naturally — vary sentence length, use contractions, show warmth. "
+            f"Be concise but never terse."
+            f"{memory_line}{search_line}"
         )
 
-        # ── 5. Run Specialist agents in parallel (ThreadPoolExecutor) ────────
-        knowledge_space = SharedKnowledgeSpace()
-        knowledge_space.write(memory_output)
+        # ── 6. Build messages list for Groq ───────────────────────────────────
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in chat_history[-8:]:
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        if search_results:
+            messages.append({"role": "user", "content": f"[SEARCH DATA]:\n{search_results}\n\nUSER: {query}"})
+        else:
+            messages.append({"role": "user", "content": query})
 
-        def run_node(node):
-            if hasattr(node, 'process'):
-                # ResearchNode gets search_results injected
-                if node.name == "ResearchNode" and has_search:
-                    return node.process(query, memory_context, self.groq_client,
-                                        chat_history, search_results=search_results)
-                return node.process(query, memory_context, self.groq_client, chat_history)
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(specialist_nodes)) as executor:
-            futures = {executor.submit(run_node, node): node for node in specialist_nodes}
-            for future in concurrent.futures.as_completed(futures):
-                try:
-                    output = future.result(timeout=15)
-                    if output:
-                        knowledge_space.write(output)
-                except Exception as e:
-                    print(f"[Orchestrator] Node failed: {e}")
-
-        all_outputs: List[AgentOutput] = knowledge_space.read_all()
-
-        # ── 6. Conflict Resolution ────────────────────────────────────────────
-        conflict_report = self.conflict_resolver.resolve(
-            [o for o in all_outputs if o.agent_name != "MemoryAgentNode"]
-        )
-
-        # ── 7. Decision Engine ────────────────────────────────────────────────
-        decision: DecisionOutput = self.decision_engine.decide(
-            outputs=all_outputs,
-            conflict_report=conflict_report,
-            memory_context=memory_output.response,
-            q_weights=q_weights,
-            groq_client=self.groq_client
-        )
-
-        # ── 8. Save this interaction to long-term memory ──────────────────────
-        self.memory.add_memory(f"User asked: {query}")
-        self.memory.add_memory(f"Hive responded via {decision.primary_agent}: {decision.chosen_response[:120]}...")
-
-        # ── 9. Track state for upcoming RL feedback update ────────────────────
+        # ── 7. Track routing state for RL ─────────────────────────────────────
         self._last_state = routing_state
-        self._last_primary_agent = decision.primary_agent
-        # Estimate token usage (Groq sometimes returns usage, fallback to char-based estimate)
-        approx_tokens = int((len(query) + len(decision.chosen_response)) / 4)
+        self._last_primary_agent = best_node.name
+        approx_tokens = int(len(query) / 4)
         self._last_total_tokens = approx_tokens
 
-        return {
-            "response": decision.chosen_response,
-            "hive_meta": {
-                "primary_agent": decision.primary_agent,
-                "confidence": round(decision.confidence, 3),
-                "routing": routing_debug,
-                "active_nodes": [n.name for n in specialist_nodes],
-                "has_conflict": conflict_report.has_conflict,
-                "conflict_agents": conflict_report.conflicting_agents,
-                "agent_scores": decision.all_agent_scores,
-                "rl_epsilon": round(self.rl_controller.epsilon, 4),
-                "q_weights": {k: round(v, 3) for k, v in q_weights.items()},
-                "approx_tokens": approx_tokens,
-                "task_difficulty": self.rl_controller.get_reward_history(1)[0]["task_difficulty"]
-                    if self.rl_controller.interaction_count > 0 else "easy"
-            }
+        hive_meta = {
+            "primary_agent": best_node.name,
+            "confidence": round(best_score, 3),
+            "routing": routing_debug,
+            "active_nodes": [n.name for n in specialist_nodes],
+            "has_conflict": False,
+            "conflict_agents": [],
+            "agent_scores": {},
+            "rl_epsilon": round(self.rl_controller.epsilon, 4),
+            "q_weights": {k: round(v, 3) for k, v in q_weights.items()},
         }
+
+        return {"messages": messages, "hive_meta": hive_meta, "routing_state": routing_state}
+
+    def finalize_stream(self, query: str, response_text: str, routing_meta: dict):
+        """Save to memory and update token count after streaming completes."""
+        self.memory.add_memory(f"User asked: {query}")
+        self.memory.add_memory(f"MAHA responded: {response_text[:120]}...")
+        approx_tokens = int((len(query) + len(response_text)) / 4)
+        self._last_total_tokens = approx_tokens
 
     # ─── RL Feedback Loop ─────────────────────────────────────────────────────
 
@@ -155,8 +173,6 @@ class HiveOrchestrator:
         feedback: 'positive' | 'negative'
         """
         reward = self.rl_controller.compute_reward(feedback)
-
-        # Next state = same (single-turn feedback) — can be improved with episode tracking
         update_result = self.rl_controller.update(
             state=self._last_state,
             agent_name=self._last_primary_agent,
@@ -164,7 +180,6 @@ class HiveOrchestrator:
             next_state=self._last_state,
             total_tokens=self._last_total_tokens
         )
-
         return {
             "status": "Q-table updated",
             "reward": reward,

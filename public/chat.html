@@ -280,6 +280,16 @@
             0%, 80%, 100% { transform: scale(0); }
             40% { transform: scale(1); }
         }
+
+        /* Gemini-style streaming cursor */
+        .stream-cursor {
+            display: inline-block;
+            color: var(--accent-color);
+            font-weight: 300;
+            animation: blink 0.7s step-end infinite;
+            margin-left: 1px;
+        }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
     </style>
 </head>
 <body>
@@ -449,46 +459,118 @@
             const text = input.value.trim();
             if (!text) return;
 
-            // Immediately track user message
+            // Track user message
             chatHistory.push({ role: 'user', content: text });
             saveStateToLocal();
             appendMessage('user', text);
             input.value = '';
             input.style.height = 'auto';
 
-            // Show loading
-            const loadingId = 'loading-' + Date.now();
-            appendLoading(loadingId);
+            // Remove loading spinner — we stream directly into a bubble
+            const msgDiv    = document.createElement('div');
+            msgDiv.className = 'message ai';
+            const avatar    = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerText = '✨';
+            const contentWrap = document.createElement('div');
+            contentWrap.style.cssText = 'display:flex;flex-direction:column;';
+            const bubble = document.createElement('div');
+            bubble.className = 'bubble';
+            bubble.innerHTML = '<span class="stream-cursor">▋</span>';
+            contentWrap.appendChild(bubble);
+            msgDiv.appendChild(avatar);
+            msgDiv.appendChild(contentWrap);
+            chatContainer.appendChild(msgDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            const historyForApi = chatHistory.slice(0, -1);
+            const userName = (localStorage.getItem('hive_email') || '').split('@')[0];
+
+            let fullText = '';
+            let hiveMeta = null;
 
             try {
-                // Determine what to send to Groq (we exclude the very last user message because we pass it as 'text')
-                const historyForApi = chatHistory.slice(0, -1);
-                
-                const response = await fetch('/api/chat', {
+                const response = await fetch('/api/chat/stream', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        text: text,
-                        history: historyForApi
-                    })
+                    body: JSON.stringify({ text, history: historyForApi, user_name: userName })
                 });
-                
-                const data = await response.json();
-                document.getElementById(loadingId).remove();
 
-                if (data.error) {
-                    appendMessage('ai', 'Error: ' + data.error);
-                } else {
-                    appendMessage('ai', data.response, false, data.hive_meta);
-                    chatHistory.push({ role: 'assistant', content: data.response });
-                    saveStateToLocal();
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buffer += decoder.decode(value, { stream: true });
+
+                    // Process all complete SSE lines in the buffer
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop(); // Keep incomplete line in buffer
+
+                    for (const line of lines) {
+                        if (!line.startsWith('data: ')) continue;
+                        const payload = line.slice(6).trim();
+                        if (!payload) continue;
+
+                        try {
+                            const evt = JSON.parse(payload);
+                            if (evt.token) {
+                                fullText += evt.token;
+                                // Format and render incrementally
+                                let formatted = fullText
+                                    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                                    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+                                    .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:3px;">$1</code>')
+                                    .replace(/\n/g,'<br>');
+                                bubble.innerHTML = formatted + '<span class="stream-cursor">▋</span>';
+                                chatContainer.scrollTop = chatContainer.scrollHeight;
+                            }
+                            if (evt.done) {
+                                hiveMeta = evt.hive_meta;
+                                // Final render without cursor
+                                let formatted = fullText
+                                    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                                    .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
+                                    .replace(/`([^`]+)`/g,'<code style="background:rgba(255,255,255,0.1);padding:2px 5px;border-radius:3px;">$1</code>')
+                                    .replace(/\n/g,'<br>');
+                                bubble.innerHTML = formatted;
+
+                                // Append Hive meta badge
+                                if (hiveMeta) {
+                                    const agentColor = {FoodNode:'#f9c74f',BusinessNode:'#90be6d',CodingNode:'#4cc9f0',ResearchNode:'#a78bfa'};
+                                    const color = agentColor[hiveMeta.primary_agent] || '#aaa';
+                                    const metaBadge = document.createElement('div');
+                                    metaBadge.style.cssText = 'margin-top:6px;font-size:0.72rem;color:rgba(255,255,255,0.35);display:flex;gap:10px;align-items:center;flex-wrap:wrap;';
+                                    metaBadge.innerHTML = `<span style="color:${color};font-weight:600;">⬡ ${hiveMeta.primary_agent}</span><span>ε=${hiveMeta.rl_epsilon}</span>`;
+                                    contentWrap.appendChild(metaBadge);
+                                }
+
+                                // Append feedback buttons
+                                const actionsBar = document.createElement('div');
+                                actionsBar.className = 'feedback-bar';
+                                actionsBar.style.cssText = 'margin-top:6px;display:flex;gap:8px;';
+                                actionsBar.innerHTML = `
+                                    <button onclick="handleFeedback(this,'up')" style="background:none;border:1px solid rgba(255,255,255,0.2);color:var(--text-secondary);border-radius:4px;padding:4px 10px;cursor:pointer;transition:0.2s;font-size:0.85rem;" onmouseover="this.style.color='#90be6d';this.style.borderColor='#90be6d'" onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='rgba(255,255,255,0.2)'">👍</button>
+                                    <button onclick="handleFeedback(this,'down')" style="background:none;border:1px solid rgba(255,255,255,0.2);color:var(--text-secondary);border-radius:4px;padding:4px 10px;cursor:pointer;transition:0.2s;font-size:0.85rem;" onmouseover="this.style.color='#f28b82';this.style.borderColor='#f28b82'" onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='rgba(255,255,255,0.2)'">👎</button>
+                                `;
+                                contentWrap.appendChild(actionsBar);
+
+                                chatHistory.push({ role: 'assistant', content: fullText });
+                                saveStateToLocal();
+                            }
+                            if (evt.error) {
+                                bubble.innerHTML = '<span style="color:#f28b82;">Error: ' + evt.error + '</span>';
+                            }
+                        } catch(e) { /* malformed JSON line, skip */ }
+                    }
                 }
-
             } catch (err) {
-                document.getElementById(loadingId).remove();
-                appendMessage('ai', 'Connection error. Make sure the server is running.');
+                bubble.innerHTML = '<span style="color:#f28b82;">Connection error. Make sure the server is running.</span>';
             }
         }
+
 
         function appendMessage(sender, text, isRestore=false, hiveMeta=null) {
             const msgDiv = document.createElement('div');
