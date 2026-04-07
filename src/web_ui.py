@@ -1,3 +1,7 @@
+"""
+Hive System — Web Server
+Wires the complete Multi-Agent pipeline into FastAPI endpoints.
+"""
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -5,16 +9,13 @@ import uvicorn
 import os
 import sys
 
-# Add current path to sys.path
 sys.path.append(os.getcwd())
 
-from src.env.assistant_env import MemoryAugmentedAssistantEnv
-from src.models.schemas import Action
+from src.orchestrator import HiveOrchestrator
 
-app = FastAPI()
-env = MemoryAugmentedAssistantEnv()
+app = FastAPI(title="Hive Multi-Agent System")
 
-# Initialize Groq Client
+# ── Initialize Groq Client ────────────────────────────────────────────────────
 try:
     from groq import Groq
     api_key = os.environ.get("GROQ_API_KEY")
@@ -22,11 +23,93 @@ try:
 except ImportError:
     groq_client = None
 
+# ── Initialize Hive Orchestrator (singleton, holds all agents + RL controller) ──
+orchestrator = HiveOrchestrator(groq_client=groq_client, db_path="hive_data.db")
+
+# ── Web Search (live internet using ddgs) ─────────────────────────────────────
+try:
+    from ddgs import DDGS
+    ddgs_available = True
+except ImportError:
+    ddgs_available = False
+
+SEARCH_KEYWORDS = [
+    "weather", "today", "current", "news", "price", "stock",
+    "latest", "now", "who is", "what is", "how much", "score"
+]
+
+
+def get_search_results(query: str) -> str:
+    """Runs DuckDuckGo search and returns formatted results string."""
+    if not ddgs_available:
+        return ""
+    try:
+        with DDGS() as ddgs:
+            results = list(ddgs.text(query, region='wt-wt', max_results=3))
+        if results:
+            print(f"[Search] Found {len(results)} results for: {query}")
+            return "\n".join([f"- {r['title']}: {r['body']}" for r in results])
+    except Exception as e:
+        print(f"[Search] Failed: {e}")
+    return ""
+
+
+# ─── Request/Response Schemas ─────────────────────────────────────────────────
 from typing import List, Dict
 
-class QueryRequest(BaseModel):
+class ChatRequest(BaseModel):
     text: str
     history: List[Dict[str, str]] = []
+
+class FeedbackRequest(BaseModel):
+    feedback: str  # 'positive' | 'negative'
+
+
+# ─── Chat Endpoint (Main Pipeline) ────────────────────────────────────────────
+@app.post("/api/chat")
+async def chat_endpoint(request: ChatRequest):
+    if not groq_client:
+        return {"error": "Groq client not initialized. Set GROQ_API_KEY environment variable."}
+
+    # Check if query needs live internet data
+    needs_search = any(kw in request.text.lower() for kw in SEARCH_KEYWORDS)
+    search_results = get_search_results(request.text) if needs_search else ""
+
+    try:
+        result = orchestrator.process(
+            query=request.text,
+            chat_history=request.history,
+            search_results=search_results
+        )
+        return result
+    except Exception as e:
+        print(f"[Orchestrator ERROR]: {e}")
+        import traceback; traceback.print_exc()
+        return {"error": str(e)}
+
+
+# ─── Feedback Endpoint (RL Reward Node) ───────────────────────────────────────
+@app.post("/api/feedback")
+async def feedback_endpoint(request: FeedbackRequest):
+    """
+    Called when user clicks 👍 or 👎.
+    Triggers the Q-Learning Bellman update.
+    """
+    result = orchestrator.apply_feedback(request.feedback)
+    return result
+
+
+# ─── RL Stats Endpoint ────────────────────────────────────────────────────────
+@app.get("/api/rl_stats")
+async def rl_stats():
+    return orchestrator.rl_controller.get_stats()
+
+
+# ─── Legacy Environment Endpoints (kept for compatibility) ────────────────────
+from src.env.assistant_env import MemoryAugmentedAssistantEnv
+from src.models.schemas import Action
+
+env = MemoryAugmentedAssistantEnv()
 
 @app.get("/api/reset")
 async def reset_env():
@@ -44,63 +127,8 @@ async def step_env(action_data: dict):
         "state": info["state"]
     }
 
-from ddgs import DDGS
 
-@app.post("/api/chat")
-async def chat_endpoint(request: QueryRequest):
-    if not groq_client:
-        return {"error": "Groq library not installed properly or client failing."}
-    
-    # Retrieve relevant past memories using Vector Search
-    memories = env.memory.retrieve(request.text)
-    mem_text = "\n".join([f"- {m.content}" for m in memories])
-    
-    system_prompt = "You are MAHA, the Memory-Augmented Hive Assistant. Be helpful, concise, and clear. You have real-time internet access."
-    
-    # Basic router: check if query needs internet
-    search_keywords = ["weather", "today", "current", "news", "price", "stock", "time", "latest", "now", "who is", "what is"]
-    needs_search = any(k in request.text.lower() for k in search_keywords)
-    
-    if needs_search:
-        try:
-            with DDGS() as ddgs:
-                # Use region wt-wt to avoid localized blocks
-                results = list(ddgs.text(request.text, region='wt-wt', max_results=3))
-                if results:
-                    search_results_text = "\n".join([f"- {r['title']}: {r['body']}" for r in results])
-                    print("DDG SEARCH SUCCESS! Found:", len(results), "results.")
-                    system_prompt += f"\n\n[CRITICAL INSTRUCTION: YOU HAVE BEEN PROVIDED LIVE INTERNET SEARCH RESULTS BELOW.]\n[DO NOT say you lack real-time access. USE this data to confidently answer the user:]\n\nSEARCH RESULTS FOR '{request.text}':\n{search_results_text}"
-                else:
-                    print("DDG SEARCH RETURNED EMPTY LIST!")
-        except Exception as e:
-            print(f"--- DDG SEARCH FAILED! ERROR: {e} ---")
-
-    if mem_text:
-        system_prompt += f"\n\n[LONG-TERM MEMORY CONTEXT]:\n{mem_text}"
-        
-    messages = [{"role": "system", "content": system_prompt}]
-    
-    # Append recent rolling chat history
-    for msg in request.history[-10:]:  # Keep last 10 messages for short-term context
-        messages.append({"role": msg["role"], "content": msg["content"]})
-        
-    # Append current user query
-    messages.append({"role": "user", "content": request.text})
-        
-    try:
-        chat_completion = groq_client.chat.completions.create(
-            messages=messages,
-            model="llama-3.1-8b-instant",
-        )
-        response_text = chat_completion.choices[0].message.content
-        
-        # Save this interaction to Vector Memory
-        env.memory.add_memory(f"User profile/fact: {request.text}")
-        
-        return {"response": response_text}
-    except Exception as e:
-        return {"error": str(e)}
-
+# ─── HTML Page Routes ─────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 async def read_chat():
     with open("public/chat.html", "r", encoding="utf-8") as f:
@@ -126,13 +154,13 @@ async def read_dev():
     with open("public/index.html", "r", encoding="utf-8") as f:
         return f.read()
 
-# --- AUTHENTICATION SYSTEM ---
+
+# ─── Authentication System ────────────────────────────────────────────────────
 import sqlite3
 import bcrypt
 import jwt
 import datetime
 
-# Initialize SQLite DB
 db_conn = sqlite3.connect("hive_data.db", check_same_thread=False)
 db_cursor = db_conn.cursor()
 db_cursor.execute('''CREATE TABLE IF NOT EXISTS users (
@@ -142,7 +170,7 @@ db_cursor.execute('''CREATE TABLE IF NOT EXISTS users (
 )''')
 db_conn.commit()
 
-JWT_SECRET = "production_ready_secret_key_hive"
+JWT_SECRET = "hive_production_jwt_secret_key"
 
 class AuthRequest(BaseModel):
     email: str
@@ -154,7 +182,6 @@ async def register_user(request: AuthRequest):
         db_cursor.execute("SELECT email FROM users WHERE email=?", (request.email,))
         if db_cursor.fetchone():
             return {"error": "Email is already registered"}
-        
         hashed = bcrypt.hashpw(request.password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
         db_cursor.execute("INSERT INTO users (email, password_hash) VALUES (?, ?)", (request.email, hashed))
         db_conn.commit()
@@ -167,15 +194,14 @@ async def auth_login(request: AuthRequest):
     try:
         db_cursor.execute("SELECT password_hash FROM users WHERE email=?", (request.email,))
         row = db_cursor.fetchone()
-        
         if not row or not bcrypt.checkpw(request.password.encode('utf-8'), row[0].encode('utf-8')):
             return {"error": "Invalid email or password"}
-            
         expiration = datetime.datetime.utcnow() + datetime.timedelta(days=7)
         token = jwt.encode({"email": request.email, "exp": expiration}, JWT_SECRET, algorithm="HS256")
         return {"token": token, "email": request.email}
     except Exception as e:
         return {"error": str(e)}
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8000)

@@ -482,7 +482,7 @@
                 if (data.error) {
                     appendMessage('ai', 'Error: ' + data.error);
                 } else {
-                    appendMessage('ai', data.response);
+                    appendMessage('ai', data.response, false, data.hive_meta);
                     chatHistory.push({ role: 'assistant', content: data.response });
                     saveStateToLocal();
                 }
@@ -493,7 +493,7 @@
             }
         }
 
-        function appendMessage(sender, text, isRestore=false) {
+        function appendMessage(sender, text, isRestore=false, hiveMeta=null) {
             const msgDiv = document.createElement('div');
             msgDiv.className = `message ${sender}`;
             
@@ -514,17 +514,29 @@
             contentContainer.style.flexDirection = 'column';
             contentContainer.appendChild(bubble);
 
+            // Add Hive Meta badge (which agent answered, confidence, Q-weight)
+            if (sender === 'ai' && hiveMeta && text.indexOf('<div class="loading-dots">') === -1) {
+                const metaBadge = document.createElement('div');
+                metaBadge.style.cssText = 'margin-top:6px; font-size:0.72rem; color: rgba(255,255,255,0.35); display:flex; gap:10px; align-items:center; flex-wrap:wrap;';
+                const agentColor = {'FoodNode':'#f9c74f','BusinessNode':'#90be6d','CodingNode':'#4cc9f0','ResearchNode':'#a78bfa','MemoryAgentNode':'#f28b82'};
+                const color = agentColor[hiveMeta.primary_agent] || '#aaa';
+                metaBadge.innerHTML = `
+                    <span style="color:${color}; font-weight:600;">⬡ ${hiveMeta.primary_agent}</span>
+                    <span>Confidence: ${(hiveMeta.confidence * 100).toFixed(0)}%</span>
+                    <span>ε=${hiveMeta.rl_epsilon}</span>
+                    ${hiveMeta.has_conflict ? '<span style="color:#f28b82;">⚠ Conflict resolved</span>' : ''}
+                `;
+                contentContainer.appendChild(metaBadge);
+            }
+
             // Add Feedback Buttons for AI messages if not a loading indicator
             if (sender === 'ai' && text.indexOf('<div class="loading-dots">') === -1) {
                 const actionsBar = document.createElement('div');
                 actionsBar.className = 'feedback-bar';
-                actionsBar.style.marginTop = '8px';
-                actionsBar.style.display = 'flex';
-                actionsBar.style.gap = '8px';
-                
+                actionsBar.style.cssText = 'margin-top:6px; display:flex; gap:8px;';
                 actionsBar.innerHTML = `
-                    <button onclick="handleFeedback(this, 'up')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='var(--accent-color)';" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='rgba(255,255,255,0.2)';">👍</button>
-                    <button onclick="handleFeedback(this, 'down')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 8px; cursor: pointer; transition: 0.2s;" onmouseover="this.style.color='#fff'; this.style.borderColor='#f28b82';" onmouseout="this.style.color='var(--text-secondary)'; this.style.borderColor='rgba(255,255,255,0.2)';">👎</button>
+                    <button onclick="handleFeedback(this, 'up')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 10px; cursor: pointer; transition: 0.2s; font-size:0.85rem;" onmouseover="this.style.color='#90be6d';this.style.borderColor='#90be6d'" onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='rgba(255,255,255,0.2)'">👍</button>
+                    <button onclick="handleFeedback(this, 'down')" style="background: none; border: 1px solid rgba(255,255,255,0.2); color: var(--text-secondary); border-radius: 4px; padding: 4px 10px; cursor: pointer; transition: 0.2s; font-size:0.85rem;" onmouseover="this.style.color='#f28b82';this.style.borderColor='#f28b82'" onmouseout="this.style.color='var(--text-secondary)';this.style.borderColor='rgba(255,255,255,0.2)'">👎</button>
                 `;
                 contentContainer.appendChild(actionsBar);
             }
@@ -536,24 +548,35 @@
             }
         }
 
-        function handleFeedback(btn, type) {
+        async function handleFeedback(btn, type) {
             const actionsBar = btn.parentElement;
             if (type === 'up') {
-                actionsBar.innerHTML = '<span style="font-size: 0.8rem; color: var(--accent-color);">Thank you for your feedback! ✓</span>';
+                // Hit RL reward endpoint with positive signal
+                fetch('/api/feedback', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback: 'positive' })
+                });
+                actionsBar.innerHTML = '<span style="font-size: 0.8rem; color: #90be6d;">✓ Great! Q-table updated with positive reward.</span>';
                 return;
             }
-            // If negative feedback, ask for reasoning directly in the UI
+            // Negative feedback — ask for reasoning
             actionsBar.innerHTML = `
                 <div style="display: flex; gap: 8px; align-items: center; width: 100%;">
-                    <input type="text" placeholder="What was wrong with the response?" style="flex:1; padding: 6px 10px; background: #131314; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; outline:none; font-size: 0.85rem;" onkeypress="if(event.key==='Enter'){submitFeedback(this)}">
-                    <button onclick="submitFeedback(this)" style="background: var(--accent-color); color: #000; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 500;">Regenerate</button>
+                    <input type="text" placeholder="What was wrong? (helps the Hive learn)" style="flex:1; padding: 6px 10px; background: #131314; border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; outline:none; font-size: 0.85rem;" onkeypress="if(event.key==='Enter'){submitFeedback(this)}">
+                    <button onclick="submitFeedback(this)" style="background: #f28b82; color: #000; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">Regenerate</button>
                 </div>
             `;
         }
 
         async function submitFeedback(element) {
-            // Find input element whether button or input itself triggered this
             const inputEl = element.tagName === 'INPUT' ? element : element.previousElementSibling;
+            // Send negative RL signal to Q-learning controller
+            fetch('/api/feedback', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ feedback: 'negative' })
+            });
             const feedbackText = inputEl.value.trim();
             if(!feedbackText) return;
 
@@ -593,7 +616,7 @@
                 if (data.error) {
                     appendMessage('ai', 'Error: ' + data.error);
                 } else {
-                    appendMessage('ai', data.response);
+                    appendMessage('ai', data.response, false, data.hive_meta);
                     chatHistory.push({ role: 'assistant', content: data.response });
                     saveStateToLocal();
                 }
