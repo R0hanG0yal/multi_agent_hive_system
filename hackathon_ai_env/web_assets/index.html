@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hackathon AI Dashboard</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div class="atmosphere atmosphere-left"></div>
+    <div class="atmosphere atmosphere-right"></div>
+    <div class="grid-haze"></div>
+
+    <div class="page-shell">
+      <header class="hero reveal">
+        <div class="eyebrow">Hackathon AI Environment</div>
+        <div class="hero-row">
+          <div>
+            <h1>Train, inspect, and challenge the multi-agent loop from your browser.</h1>
+            <p class="hero-copy">
+              This dashboard exposes the same architecture as the CLI:
+              agent routing, shared memory, decision fusion, Q-learning,
+              deterministic rewards, and memory updates with decay.
+            </p>
+          </div>
+          <div class="hero-badge">
+            <div class="badge-label">Policy Status</div>
+            <div id="trained-indicator" class="badge-value">Not trained</div>
+            <div id="epsilon-indicator" class="badge-subtle">epsilon --</div>
+          </div>
+        </div>
+
+        <div class="metric-strip">
+          <article class="metric-card">
+            <span class="metric-label">Q States</span>
+            <strong id="q-state-count">0</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Memory Items</span>
+            <strong id="memory-count">0</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Top Weight</span>
+            <strong id="memory-top-weight">0.00</strong>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">Scenarios</span>
+            <strong id="scenario-count">0</strong>
+          </article>
+        </div>
+
+        <div class="hero-meta-grid">
+          <article class="meta-card">
+            <span class="meta-label">Persistence</span>
+            <strong id="persistence-summary">Checking storage</strong>
+            <p id="persistence-detail">The dashboard will show whether learned state is being saved for restart recovery.</p>
+          </article>
+          <article class="meta-card">
+            <span class="meta-label">Feedback Loop</span>
+            <strong id="feedback-loop-summary">Idle</strong>
+            <p id="feedback-loop-detail">Ask a query, rate the answer, and the policy updates from your reward signal.</p>
+          </article>
+          <article class="meta-card">
+            <span class="meta-label">Session Path</span>
+            <strong id="storage-path-label">Not configured</strong>
+            <p id="storage-path-detail">For Hugging Face, `/data` should be backed by persistent storage if you want restart-safe memory.</p>
+          </article>
+        </div>
+      </header>
+
+      <main class="dashboard-grid">
+        <section class="panel control-panel reveal">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">Control Room</p>
+              <h2>Drive the environment</h2>
+            </div>
+            <button id="reset-button" class="ghost-button" type="button">Reset</button>
+          </div>
+
+          <form id="train-form" class="action-card">
+            <div class="action-head">
+              <h3>Train policy</h3>
+              <span>Rebuilds the Q-table from scratch</span>
+            </div>
+            <label class="field">
+              <span>Episodes</span>
+              <input id="episodes-input" name="episodes" type="number" min="1" value="40" />
+            </label>
+            <button class="primary-button" type="submit">Train Environment</button>
+          </form>
+
+          <form id="eval-form" class="action-card">
+            <div class="action-head">
+              <h3>Evaluate benchmark</h3>
+              <span>Runs the built-in food, business, research, and memory tasks</span>
+            </div>
+            <button class="secondary-button" type="submit">Run Evaluation</button>
+          </form>
+
+          <form id="ask-form" class="action-card ask-card">
+            <div class="action-head">
+              <h3>Ask a custom query</h3>
+              <span>Warm the memory bank first if you want retrieval behavior</span>
+            </div>
+            <div class="composer-toolbar">
+              <span id="query-mode-pill" class="composer-pill">Fresh query</span>
+              <span id="query-helper-copy" class="composer-copy">Recipe, startup, research, memory recall, and health-aware prompts work best with clear intent.</span>
+            </div>
+            <label class="field">
+              <span>Query</span>
+              <textarea
+                id="query-input"
+                name="query"
+                rows="5"
+                placeholder="What pricing model should we use for a student startup?"
+              ></textarea>
+            </label>
+            <label class="checkbox-row">
+              <input id="warm-memory-input" type="checkbox" checked />
+              <span>Warm memory before answering</span>
+            </label>
+            <div class="ask-hint-grid">
+              <div class="ask-hint-card">
+                <span class="ask-hint-label">Good for demos</span>
+                <p>Try a clear task first, then give feedback, retrain, and ask a similar follow-up to show learning.</p>
+              </div>
+              <div class="ask-hint-card">
+                <span class="ask-hint-label">Persistence check</span>
+                <p>Train once, ask and rate, restart the server, then ask again to verify the saved state reloads.</p>
+              </div>
+            </div>
+            <button class="accent-button" type="submit">Ask the Environment</button>
+          </form>
+
+          <section class="sample-card">
+            <div class="action-head">
+              <h3>Quick prompts</h3>
+              <span>Tap one to populate the query box</span>
+            </div>
+            <div class="sample-list">
+              <button class="sample-chip" data-query="What was the budget-friendly dinner idea we discussed earlier?" type="button">Recall dinner idea</button>
+              <button class="sample-chip" data-query="Design an A/B test to evaluate our onboarding flow." type="button">Research query</button>
+              <button class="sample-chip" data-query="Suggest a pricing model for our campus delivery startup." type="button">Business query</button>
+              <button class="sample-chip" data-query="Recommend a high-protein vegetarian breakfast for a hackathon morning." type="button">Food query</button>
+            </div>
+          </section>
+        </section>
+
+        <section class="panel insight-panel reveal">
+          <div class="panel-head">
+            <div>
+              <p class="panel-kicker">System Snapshot</p>
+              <h2>What the policy is doing</h2>
+            </div>
+          </div>
+
+          <div id="notice" class="notice neutral">Waiting for your first action.</div>
+
+          <section class="session-strip">
+            <article class="session-card">
+              <span class="session-label">Session health</span>
+              <strong id="session-health">Waiting</strong>
+              <p id="session-health-detail">Train the environment to populate the current policy and memory views.</p>
+            </article>
+            <article class="session-card">
+              <span class="session-label">Persistence status</span>
+              <strong id="session-persistence">Unknown</strong>
+              <p id="session-persistence-detail">Storage status will update after the dashboard loads.</p>
+            </article>
+            <article class="session-card">
+              <span class="session-label">Feedback status</span>
+              <strong id="session-feedback">Idle</strong>
+              <p id="session-feedback-detail">No pending answer to rate yet.</p>
+            </article>
+          </section>
+
+          <div class="architecture-strip">
+            <div class="arch-node">Agents</div>
+            <div class="arch-arrow">></div>
+            <div class="arch-node">Fusion</div>
+            <div class="arch-arrow">></div>
+            <div class="arch-node">Q-Learning</div>
+            <div class="arch-arrow">></div>
+            <div class="arch-node">Reward</div>
+            <div class="arch-arrow">></div>
+            <div class="arch-node">Memory</div>
+          </div>
+
+          <div class="status-grid">
+            <article class="status-card">
+              <span class="status-label">Training</span>
+              <strong id="training-summary">No run yet</strong>
+              <p id="training-detail">Train the environment to generate a fresh policy summary.</p>
+            </article>
+            <article class="status-card">
+              <span class="status-label">Evaluation</span>
+              <strong id="evaluation-summary">No evaluation yet</strong>
+              <p id="evaluation-detail">Run the benchmark suite to inspect accuracy and rewards.</p>
+            </article>
+            <article class="status-card">
+              <span class="status-label">Latest Answer</span>
+              <strong id="answer-summary">No query yet</strong>
+              <p id="answer-detail">Ask a custom question to see agent routing and memory usage.</p>
+            </article>
+          </div>
+
+          <section class="result-card">
+            <div class="result-head">
+              <h3>Latest response</h3>
+              <span id="result-route">Route unavailable</span>
+            </div>
+            <div id="answer-meta" class="answer-meta empty">
+              Response metadata appears here after a custom query.
+            </div>
+            <pre id="answer-output" class="answer-output">No custom query has been answered yet.</pre>
+            <div id="answer-explanation" class="answer-explanation empty">
+              A plain-language explanation of the route will appear here after a query.
+            </div>
+            <div id="feedback-applied-container" style="display: none; margin-top: 12px; padding: 12px; background: var(--color-surface-hover); border-radius: 6px; border-left: 3px solid var(--color-accent);">
+              <strong style="display:block; margin-bottom: 4px; color: var(--color-accent); font-size: 13px;">Feedback Rules Applied:</strong>
+              <span id="feedback-applied-text" style="font-family: var(--font-mono); white-space: pre-wrap; font-size: 13px; color: var(--color-text-subtle);"></span>
+            </div>
+          </section>
+
+          <section class="result-card">
+            <div class="result-head">
+              <h3>Decision graph</h3>
+              <span id="graph-status">No query yet</span>
+            </div>
+            <div id="step-graph" class="step-graph empty">
+              Ask a custom query to visualize each step of the pipeline.
+            </div>
+          </section>
+
+          <section id="feedback-card" class="result-card">
+            <div class="result-head">
+              <h3>User feedback</h3>
+              <span id="feedback-status">Ask a query first</span>
+            </div>
+            <form id="feedback-form" class="feedback-form">
+              <label class="field">
+                <span>Rating</span>
+                <select id="feedback-rating" class="select-input">
+                  <option value="5">5 - Great</option>
+                  <option value="4">4 - Good</option>
+                  <option value="3">3 - Okay</option>
+                  <option value="2">2 - Weak</option>
+                  <option value="1">1 - Bad</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Optional note</span>
+                <textarea
+                  id="feedback-notes"
+                  rows="3"
+                  placeholder="What should the agent improve next time?"
+                ></textarea>
+              </label>
+              <button id="feedback-submit" class="secondary-button" type="submit" disabled>
+                Submit feedback and calculate reward
+              </button>
+            </form>
+            <div id="feedback-result" class="feedback-result empty">
+              Reward for custom queries will be calculated after you rate the answer.
+            </div>
+          </section>
+
+          <section class="result-card">
+            <div class="result-head">
+              <h3>Benchmark results</h3>
+              <span id="eval-count">0 scenarios</span>
+            </div>
+            <div id="evaluation-table" class="evaluation-table empty">
+              Evaluation results will appear here.
+            </div>
+          </section>
+
+          <section class="result-card">
+            <div class="result-head">
+              <h3>Training curve</h3>
+              <span id="timeline-range">No training yet</span>
+            </div>
+            <div id="timeline" class="timeline empty">No training history yet.</div>
+          </section>
+
+          <section class="inspector-grid">
+            <section class="result-card">
+              <div class="result-head">
+                <h3>Q-table viewer</h3>
+                <span id="q-table-count">0 states</span>
+              </div>
+              <div id="q-table-panel" class="stack-list empty">
+                Train the environment to inspect learned state-action values.
+              </div>
+            </section>
+
+            <section class="result-card">
+              <div class="result-head">
+                <h3>Memory bank viewer</h3>
+                <span id="memory-bank-count">0 records</span>
+              </div>
+              <div id="memory-bank-panel" class="stack-list empty">
+                Memory records will appear here after training or evaluation.
+              </div>
+            </section>
+          </section>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>

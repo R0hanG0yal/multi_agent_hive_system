@@ -1,0 +1,57 @@
+name: memory_augmented_ai_environment
+version: 0.1.0
+description: >
+  Multi-agent reinforcement-learning environment with vector routing, shared memory,
+  user-feedback rewards, and an interactive dashboard.
+entrypoint:
+  type: http
+  base_path: /
+routes:
+  reset:
+    method: POST
+    path: /reset
+  step:
+    method: POST
+    path: /step
+  state:
+    method: GET
+    path: /state
+  metadata:
+    method: GET
+    path: /metadata
+  health:
+    method: GET
+    path: /health
+action_schema:
+  type: object
+  properties:
+    query:
+      type: string
+    warm_memory:
+      type: boolean
+    rating:
+      type: integer
+      minimum: 1
+      maximum: 5
+    notes:
+      type: string
+    episodes:
+      type: integer
+      minimum: 1
+observation_schema:
+  type: object
+  properties:
+    answer:
+      type: string
+    final_agent:
+      type: string
+    selected_agent:
+      type: string
+    state_key:
+      type: string
+    explanation:
+      type: string
+    recalled_memory_keys:
+      type: array
+      items:
+        type: string
